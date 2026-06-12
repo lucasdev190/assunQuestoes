@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plataforma de Questões</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800">
+
+    <nav class="bg-white shadow-sm border-b p-4 mb-6">
+        <div class="max-w-5xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold text-blue-600">GranQuestões Clone</h1>
+            <div class="flex gap-4">
+                <button onclick="mudarAba('questoes')" id="btn-aba-questoes" class="font-semibold text-blue-600 border-b-2 border-blue-600 pb-1">Questões</button>
+                <button onclick="mudarAba('estatisticas')" id="btn-aba-estatisticas" class="font-semibold text-gray-500 hover:text-blue-600 pb-1">Estatísticas (<span id="cont-total">0</span>)</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-5xl mx-auto px-4">
+        
+        <div id="aba-questoes" class="space-y-6">
+            
+            <div class="bg-white p-6 rounded-lg shadow-sm border space-y-4">
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="filtrar('todas')" id="filt-todas" class="px-4 py-1.5 rounded-full text-sm bg-blue-600 text-white font-medium">Todas as questões</button>
+                    <button onclick="filtrar('nao_resolvidas')" id="filt-nao_resolvidas" class="px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium">Não resolvidas</button>
+                    <button onclick="filtrar('certas')" id="filt-certas" class="px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium">Certas</button>
+                    <button onclick="filtrar('erradas')" id="filt-erradas" class="px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium">Erradas</button>
+                    <button onclick="resetarProgresso()" class="ml-auto px-4 py-1.5 rounded-full text-sm bg-red-100 text-red-600 hover:bg-red-200 font-bold transition">Resetar Progresso</button>
+                </div>
+            </div>
+
+            <div id="lista-questoes" class="space-y-6">
+                <p class="text-gray-500 text-center py-8">Carregando questões do banco de dados...</p>
+            </div>
+        </div>
+
+        <div id="aba-estatisticas" class="hidden bg-white p-8 rounded-lg shadow-sm border max-w-xl mx-auto">
+            <h2 class="text-2xl font-bold mb-6 text-gray-800">Seu Desempenho</h2>
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <span class="block text-2xl font-bold text-blue-600" id="stat-resolvidas">0</span>
+                    <span class="text-sm text-gray-600">Resolvidas</span>
+                </div>
+                <div class="bg-green-50 p-4 rounded-lg">
+                    <span class="block text-2xl font-bold text-green-600" id="stat-certas">0</span>
+                    <span class="text-sm text-gray-600">Certas</span>
+                </div>
+                <div class="bg-red-50 p-4 rounded-lg">
+                    <span class="block text-2xl font-bold text-red-600" id="stat-erradas">0</span>
+                    <span class="text-sm text-gray-600">Erradas</span>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+       // CONFIGURAÇÃO DO SUPABASE
+       const SUPABASE_URL = "https://ykampvnnrkwvraxanunm.supabase.co";
+       const SUPABASE_ANON_KEY = "sb_publishable_bRqoO7pDDq5qC8RvSklJGA_IaHCerUH";
+
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // VARIÁVEIS DE ESTADO DO SISTEMA
+        let bancoQuestoes = [];
+        let filtroAtual = 'todas';
+
+        // CARREGAR DADOS DO LOCALSTORAGE
+        let resolvidas = JSON.parse(localStorage.getItem('gq_resolvidas')) || [];
+        let certas = JSON.parse(localStorage.getItem('gq_certas')) || [];
+        let erradas = JSON.parse(localStorage.getItem('gq_erradas')) || [];
+
+        // BUSCAR QUESTÕES DO SUPABASE ASSIM QUE ENTRAR
+        async function baixarQuestoes() {
+            try {
+                const { data, error } = await supabase.from('questoes').select('*').order('id', { ascending: false });
+                if (error) throw error;
+                bancoQuestoes = data;
+                renderizarQuestoes();
+                atualizarContadores();
+            } catch (error) {
+                document.getElementById('lista-questoes').innerHTML = `<p class="text-red-500 text-center">Erro ao carregar dados: ${error.message}</p>`;
+            }
+        }
+
+        // REDERIZAR QUESTÕES NA TELA
+        function renderizarQuestoes() {
+            const container = document.getElementById('lista-questoes');
+            container.innerHTML = '';
+
+            // Filtrar array antes de exibir
+            const questoesFiltradas = bancoQuestoes.filter(q => {
+                if (filtroAtual === 'nao_resolvidas') return !resolvidas.includes(q.id);
+                if (filtroAtual === 'certas') return certas.includes(q.id);
+                if (filtroAtual === 'erradas') return erradas.includes(q.id);
+                return true; // 'todas'
+            });
+
+            if (questoesFiltradas.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-center py-8">Nenhuma questão encontrada nesta categoria.</p>';
+                return;
+            }
+
+            questoesFiltradas.forEach((q, index) => {
+                const jaRespondeu = resolvidas.includes(q.id);
+                const foiCerta = certas.includes(q.id);
+
+                let card = document.createElement('div');
+                card.className = "bg-white p-6 rounded-lg shadow-sm border space-y-4";
+                card.innerHTML = `
+                    <div class="text-xs text-blue-600 font-semibold space-x-2">
+                        <span>#${q.id}</span> • <span>${q.materia}</span> • <span>${q.assunto}</span>
+                    </div>
+                    <div class="text-gray-800 text-base font-medium whitespace-pre-line">${q.enunciado}</div>
+                    
+                    <div class="space-y-2" id="alternativas-${q.id}">
+                        ${['a', 'b', 'c', 'd', 'e'].map(letra => {
+                            if(!q[`alternativa_${letra}`]) return ''; // Pula se não houver a alternativa
+                            return `
+                                <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-gray-50 transition">
+                                    <input type="radio" name="q-${q.id}" value="${letra.toUpperCase()}" ${jaRespondeu ? 'disabled' : ''} class="w-4 h-4 text-blue-600">
+                                    <span class="font-bold text-gray-500">${letra.toUpperCase()})</span>
+                                    <span>${q[`alternativa_${letra}`]}</span>
+                                </label>
+                            `;
+                        }).join('')}
+                    </div>
+
+                    <div class="flex items-center gap-4">
+                        <button onclick="validarResposta(${q.id})" id="btn-${q.id}" ${jaRespondeu ? 'disabled class="hidden"' : 'class="bg-blue-600 text-white px-6 py-2 rounded font-semibold text-sm hover:bg-blue-700 transition"'}>
+                            Responder
+                        </button>
+                        ${jaRespondeu ? `<span class="text-sm font-bold ${foiCerta ? 'text-green-600' : 'text-red-600'}">${foiCerta ? '✓ Você acertou!' : '✕ Você errou!'}</span>` : ''}
+                    </div>
+
+                    <div id="explicacao-${q.id}" class="${jaRespondeu ? '' : 'hidden'} bg-yellow-50 border border-yellow-200 p-4 rounded-md mt-4 text-sm text-gray-700">
+                        <strong class="block text-yellow-800 mb-1">Gabarito comentado (Alternativa ${q.correta}):</strong>
+                        ${q.explicacao}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // VERIFICAR ACERTO OU ERRO
+        function validarResposta(id) {
+            const radioSelecionado = document.querySelector(`input[name="q-${id}"]:checked`);
+            if (!radioSelecionado) {
+                alert("Por favor, selecione uma alternativa antes de responder!");
+                return;
+            }
+
+            const respostaUsuario = radioSelecionado.value;
+            const questao = bancoQuestoes.find(q => q.id === id);
+
+            resolvidas.push(id);
+            if (respostaUsuario === questao.correta.toUpperCase()) {
+                certas.push(id);
+            } else {
+                erradas.push(id);
+            }
+
+            // Salva o progresso
+            localStorage.setItem('gq_resolvidas', JSON.stringify(resolvidas));
+            localStorage.setItem('gq_certas', JSON.stringify(certas));
+            localStorage.setItem('gq_erradas', JSON.stringify(erradas));
+
+            atualizarContadores();
+            renderizarQuestoes();
+        }
+
+        // RESETAR PROGRESSO (ZERA TUDO NO NAVEGADOR)
+        function resetarProgresso() {
+            if(confirm("Tem certeza que deseja limpar todo o seu progresso, acertos e erros?")) {
+                localStorage.clear();
+                resolvidas = []; certas = []; erradas = [];
+                atualizarContadores();
+                renderizarQuestoes();
+            }
+        }
+
+        // ATUALIZAR NÚMEROS DAS ABAS
+        function atualizarContadores() {
+            document.getElementById('cont-total').innerText = resolvidas.length;
+            document.getElementById('stat-resolvidas').innerText = resolvidas.length;
+            document.getElementById('stat-certas').innerText = certas.length;
+            document.getElementById('stat-erradas').innerText = erradas.length;
+        }
+
+        // CONTROLAR SISTEMA DE FILTROS NA TELA
+        function filtrar(tipo) {
+            filtroAtual = tipo;
+            ['todas', 'nao_resolvidas', 'certas', 'erradas'].forEach(f => {
+                const btn = document.getElementById(`filt-${f}`);
+                if(f === tipo) {
+                    btn.className = "px-4 py-1.5 rounded-full text-sm bg-blue-600 text-white font-medium";
+                } else {
+                    btn.className = "px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium";
+                }
+            });
+            renderizarQuestoes();
+        }
+
+        // TROCAR ENTRE ABA DE QUESTÕES E DE CONTADOR (ESTATÍSTICAS)
+        function mudarAba(aba) {
+            if(aba === 'questoes') {
+                document.getElementById('aba-questoes').classList.remove('hidden');
+                document.getElementById('aba-estatisticas').classList.add('hidden');
+                document.getElementById('btn-aba-questoes').className = "font-semibold text-blue-600 border-b-2 border-blue-600 pb-1";
+                document.getElementById('btn-aba-estatisticas').className = "font-semibold text-gray-500 hover:text-blue-600 pb-1";
+            } else {
+                document.getElementById('aba-questoes').classList.add('hidden');
+                document.getElementById('aba-estatisticas').classList.remove('hidden');
+                document.getElementById('btn-aba-questoes').className = "font-semibold text-gray-500 hover:text-blue-600 pb-1";
+                document.getElementById('btn-aba-estatisticas').className = "font-semibold text-blue-600 border-b-2 border-blue-600 pb-1";
+            }
+        }
+
+        // Inicializar aplicação ao abrir a página
+        baixarQuestoes();
+    </script>
+</body>
+</html>
