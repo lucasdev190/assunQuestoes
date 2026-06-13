@@ -42,10 +42,9 @@
 
                 <hr class="border-gray-100">
 
-                <!-- Botões de Filtros de Status -->
+                <!-- Botões de Filtros de Status (Aba "Todas" removida aqui) -->
                 <div class="flex flex-wrap gap-2 items-center">
-                    <!--<button onclick="filtrar('todas')" id="filt-todas" class="px-4 py-1.5 rounded-full text-sm bg-blue-600 text-white font-medium">Todas as questões</button>-->
-                    <button onclick="filtrar('nao_resolvidas')" id="filt-nao_resolvidas" class="px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium">Não resolvidas</button>
+                    <button onclick="filtrar('nao_resolvidas')" id="filt-nao_resolvidas" class="px-4 py-1.5 rounded-full text-sm bg-blue-600 text-white font-medium">Não resolvidas</button>
                     <button onclick="filtrar('certas')" id="filt-certas" class="px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium">Certas</button>
                     <button onclick="filtrar('erradas')" id="filt-erradas" class="px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium">Erradas</button>
                     <button onclick="resetarProgresso()" class="ml-auto px-4 py-1.5 rounded-full text-sm bg-red-100 text-red-600 hover:bg-red-200 font-bold transition">Resetar Abas</button>
@@ -87,7 +86,8 @@
         const bancoDeDados = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let bancoQuestoes = [];
-        let filtroAtual = 'todas';
+        // MODIFICADO: Agora o padrão ao abrir o site é listar as 'nao_resolvidas'
+        let filtroAtual = 'nao_resolvidas';
         
         // Mantém a trava presa APENAS quando respondida dentro da aba 'erradas'
         let questoesNaTelaQueForamRespondidas = [];
@@ -117,7 +117,7 @@
             const container = document.getElementById('lista-questoes');
             container.innerHTML = '';
 
-            // Pega os textos digitados nos inputs de pesquisa (convertendo para minúsculo)
+            // Pega os textos digitados nos inputs de pesquisa
             const buscaMateria = document.getElementById('busca-materia').value.toLowerCase().trim();
             const buscaAssunto = document.getElementById('busca-assunto').value.toLowerCase().trim();
 
@@ -127,14 +127,13 @@
                 const bateAssunto = q.assunto ? q.assunto.toLowerCase().includes(buscaAssunto) : true;
                 if (!bateMateria || !bateAssunto) return false;
 
-                // 2. FILTRO DE STATUS DA ABA + TRAVA INTELIGENTE
-                // Removida a trava na aba 'todas': agora ela só age se você responder dentro da aba de 'erradas'
+                // 2. FILTRO DE STATUS DA ABA + TRAVA INTELIGENTE NA ABA ERRADAS
                 if (filtroAtual === 'erradas' && questoesNaTelaQueForamRespondidas.includes(q.id)) return true;
 
                 if (filtroAtual === 'nao_resolvidas') return !certas.includes(q.id) && !erradas.includes(q.id);
                 if (filtroAtual === 'certas') return certas.includes(q.id);
                 if (filtroAtual === 'erradas') return erradas.includes(q.id);
-                return true; // 'todas'
+                return true;
             });
 
             if (questoesFiltradas.length === 0) {
@@ -202,7 +201,7 @@
             totalResolvidasContador++;
             localStorage.setItem('gq_total_contador', totalResolvidasContador);
 
-            // A trava só é ativada se você estiver respondendo DE DENTRO da aba de erradas
+            // A trava só é ativada se você estiver respondendo dentro da aba de erradas
             if (filtroAtual === 'erradas' && !questoesNaTelaQueForamRespondidas.includes(id)) {
                 questoesNaTelaQueForamRespondidas.push(id);
             }
@@ -219,14 +218,13 @@
 
             atualizarContadores();
             
-            // LÓGICA DE ATUALIZAÇÃO VISUAL EM TEMPO REAL
             const acertouAgora = certas.includes(id);
             
-            if (filtroAtual === 'todas' && acertouAgora) {
-                // Na aba 'todas', nós re-renderizamos completo para mover as coisas e atualizar sem prender nada
+            // Se o usuário responder na aba de "Não resolvidas" e acertar ou errar, re-renderiza para mover o card
+            if (filtroAtual === 'nao_resolvidas') {
                 renderizarQuestoes();
             } else {
-                // Nas outras abas (ou em caso de erro), atualiza cirurgicamente o card na tela
+                // Se estiver na aba erradas, roda a trava cirúrgica para deixar ele ler a explicação
                 const areaFeedback = document.getElementById(`feedback-area-${id}`);
                 if (acertouAgora) {
                     areaFeedback.innerHTML = `<span class="text-sm font-bold text-green-600">✓ Você acertou!</span>`;
@@ -266,7 +264,7 @@
             filtroAtual = tipo;
             questoesNaTelaQueForamRespondidas = []; // Libera a trava antiga ao trocar de filtro
             
-            ['todas', 'nao_resolvidas', 'certas', 'erradas'].forEach(f => {
+            ['nao_resolvidas', 'certas', 'erradas'].forEach(f => {
                 const btn = document.getElementById(`filt-${f}`);
                 if(f === tipo) {
                     btn.className = "px-4 py-1.5 rounded-full text-sm bg-blue-600 text-white font-medium";
@@ -278,7 +276,7 @@
         }
 
         function mudarAba(aba) {
-            questoesNaTelaQueForamRespondidas = []; // Libera a trava ao trocar de aba principal
+            questoesNaTelaQueForamRespondidas = [];
             
             if(aba === 'questoes') {
                 document.getElementById('aba-questoes').classList.remove('hidden');
