@@ -67,6 +67,10 @@
 
         let bancoQuestoes = [];
         let filtroAtual = 'todas';
+        
+        // Essa lista vai guardar temporariamente quais questões o usuário acabou de responder na tela ATUAL
+        // Evitando que elas sumam da visão antes dele mudar de filtro ou aba
+        let questoesNaTelaQueForamRespondidas = [];
 
         // CARREGA O PROGRESSO DO NAVEGADOR
         let totalResolvidasContador = parseInt(localStorage.getItem('gq_total_contador')) || 0;
@@ -94,6 +98,9 @@
             container.innerHTML = '';
 
             const questoesFiltradas = bancoQuestoes.filter(q => {
+                // TRAVA INTELIGENTE: Se a questão foi respondida AGORA nessa tela, não deixa ela sumir mesmo que o filtro mude de estado
+                if (questoesNaTelaQueForamRespondidas.includes(q.id)) return true;
+
                 if (filtroAtual === 'nao_resolvidas') return !certas.includes(q.id) && !erradas.includes(q.id);
                 if (filtroAtual === 'certas') return certas.includes(q.id);
                 if (filtroAtual === 'erradas') return erradas.includes(q.id);
@@ -130,7 +137,7 @@
                         }).join('')}
                     </div>
 
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-4" id="feedback-area-${q.id}">
                         ${!acertouAinda ? `
                             <button onclick="validarResposta(${q.id})" id="btn-${q.id}" class="bg-blue-600 text-white px-6 py-2 rounded font-semibold text-sm hover:bg-blue-700 transition">
                                 Responder
@@ -159,32 +166,53 @@
             const respostaUsuario = radioSelecionado.value;
             const questao = bancoQuestoes.find(q => q.id === id);
 
-            // Sempre soma 1 no contador geral histórico a cada clique de resposta
             totalResolvidasContador++;
             localStorage.setItem('gq_total_contador', totalResolvidasContador);
 
+            // Adiciona na lista temporária para prender a questão na tela atual do usuário
+            if (!questoesNaTelaQueForamRespondidas.includes(id)) {
+                questoesNaTelaQueForamRespondidas.push(id);
+            }
+
             if (respostaUsuario === questao.correta.toUpperCase()) {
-                // Se acertou, salva nas certas e remove das erradas se ela estivesse lá
                 if (!certas.includes(id)) certas.push(id);
                 erradas = erradas.filter(item => item !== id);
             } else {
-                // Se errou, vai para as erradas (apenas se já não estiver lá)
                 if (!erradas.includes(id)) erradas.push(id);
             }
 
-            // Grava o progresso das abas no navegador
             localStorage.setItem('gq_certas', JSON.stringify(certas));
             localStorage.setItem('gq_erradas', JSON.stringify(erradas));
 
             atualizarContadores();
-            renderizarQuestoes();
+            
+            // Em vez de recriar a lista inteira do zero (o que faria a questão sumir), 
+            // nós atualizamos apenas o card específico visualmente!
+            const acertouAgora = certas.includes(id);
+            
+            // Atualiza a área do botão
+            const areaFeedback = document.getElementById(`feedback-area-${id}`);
+            if (acertouAgora) {
+                areaFeedback.innerHTML = `<span class="text-sm font-bold text-green-600">✓ Você acertou!</span>`;
+                // Desativa os inputs de rádio para congelar na certa
+                document.querySelectorAll(`input[name="q-${id}"]`).forEach(input => input.disabled = true);
+                // Revela a caixinha amarela de explicação
+                document.getElementById(`explicacao-${id}`).classList.remove('hidden');
+            } else {
+                areaFeedback.innerHTML = `
+                    <button onclick="validarResposta(${id})" id="btn-${id}" class="bg-blue-600 text-white px-6 py-2 rounded font-semibold text-sm hover:bg-blue-700 transition">
+                        Responder
+                    </button>
+                    <span class="text-sm font-bold text-red-600">✕ Resposta incorreta! Tente novamente.</span>
+                `;
+            }
         }
 
-        // RESET INTELIGENTE: Limpa as abas de certas e erradas, mas NÃO mexe no contador histórico total
         function resetarProgresso() {
             if(confirm("Deseja limpar as abas? As questões voltarão para 'Não resolvidas', mas o seu contador histórico total será mantido nas estatísticas.")) {
                 certas = []; 
                 erradas = [];
+                questoesNaTelaQueForamRespondidas = []; // Limpa a trava
                 localStorage.setItem('gq_certas', JSON.stringify(certas));
                 localStorage.setItem('gq_erradas', JSON.stringify(erradas));
                 atualizarContadores();
@@ -199,8 +227,11 @@
             document.getElementById('stat-erradas').innerText = erradas.length;
         }
 
+        // QUANDO CLICA EM UM FILTRO, LIMPA A TRAVA DA TELA ANTERIOR
         function filtrar(tipo) {
             filtroAtual = tipo;
+            questoesNaTelaQueForamRespondidas = []; // Libera as questões para irem aos seus novos lugares
+            
             ['todas', 'nao_resolvidas', 'certas', 'erradas'].forEach(f => {
                 const btn = document.getElementById(`filt-${f}`);
                 if(f === tipo) {
@@ -212,12 +243,16 @@
             renderizarQuestoes();
         }
 
+        // QUANDO MUDA DE ABA, LIMPA A TRAVA TAMBÉM
         function mudarAba(aba) {
+            questoesNaTelaQueForamRespondidas = []; // Libera a trava
+            
             if(aba === 'questoes') {
                 document.getElementById('aba-questoes').classList.remove('hidden');
                 document.getElementById('aba-estatisticas').classList.add('hidden');
                 document.getElementById('btn-aba-questoes').className = "font-semibold text-blue-600 border-b-2 border-blue-600 pb-1";
                 document.getElementById('btn-aba-estatisticas').className = "font-semibold text-gray-500 hover:text-blue-600 pb-1";
+                renderizarQuestoes(); // Re-renderiza para aplicar a limpeza da trava
             } else {
                 document.getElementById('aba-questoes').classList.add('hidden');
                 document.getElementById('aba-estatisticas').classList.remove('hidden');
