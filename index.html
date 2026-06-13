@@ -29,7 +29,7 @@
                     <button onclick="filtrar('nao_resolvidas')" id="filt-nao_resolvidas" class="px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium">Não resolvidas</button>
                     <button onclick="filtrar('certas')" id="filt-certas" class="px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium">Certas</button>
                     <button onclick="filtrar('erradas')" id="filt-erradas" class="px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium">Erradas</button>
-                    <button onclick="resetarProgresso()" class="ml-auto px-4 py-1.5 rounded-full text-sm bg-red-100 text-red-600 hover:bg-red-200 font-bold transition">Resetar Progresso</button>
+                    <button onclick="resetarProgresso()" class="ml-auto px-4 py-1.5 rounded-full text-sm bg-red-100 text-red-600 hover:bg-red-200 font-bold transition">Resetar Abas</button>
                 </div>
             </div>
 
@@ -43,15 +43,15 @@
             <div class="grid grid-cols-3 gap-4 text-center">
                 <div class="bg-blue-50 p-4 rounded-lg">
                     <span class="block text-2xl font-bold text-blue-600" id="stat-resolvidas">0</span>
-                    <span class="text-sm text-gray-600">Resolvidas</span>
+                    <span class="text-sm text-gray-600">Total Resolvidas (Histórico)</span>
                 </div>
                 <div class="bg-green-50 p-4 rounded-lg">
                     <span class="block text-2xl font-bold text-green-600" id="stat-certas">0</span>
-                    <span class="text-sm text-gray-600">Certas</span>
+                    <span class="text-sm text-gray-600">Certas Atuais</span>
                 </div>
                 <div class="bg-red-50 p-4 rounded-lg">
                     <span class="block text-2xl font-bold text-red-600" id="stat-erradas">0</span>
-                    <span class="text-sm text-gray-600">Erradas</span>
+                    <span class="text-sm text-gray-600">Erradas Atuais</span>
                 </div>
             </div>
         </div>
@@ -63,24 +63,22 @@
         const SUPABASE_URL = "https://ykampvnnrkwvraxanunm.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrYW1wdm5ucmt3dnJheGFudW5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTY1MzMsImV4cCI6MjA5Njg3MjUzM30.CScVluXVuZQ31zLWolNFLREz4mH-Cu-YGxlw6YrfeY8"; 
 
-        // Usando a variável limpa 'bancoDeDados' para evitar o erro de SyntaxError
         const bancoDeDados = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let bancoQuestoes = [];
         let filtroAtual = 'todas';
 
-        // Puxa o progresso salvo na memória do navegador (LocalStorage)
-        let resolvidas = JSON.parse(localStorage.getItem('gq_resolvidas')) || [];
+        // CARREGA O PROGRESSO DO NAVEGADOR
+        let totalResolvidasContador = parseInt(localStorage.getItem('gq_total_contador')) || 0;
         let certas = JSON.parse(localStorage.getItem('gq_certas')) || [];
         let erradas = JSON.parse(localStorage.getItem('gq_erradas')) || [];
 
-        // BUSCA AS QUESTÕES DO SUPABASE
         async function baixarQuestoes() {
             try {
                 const { data, error } = await bancoDeDados
                     .from('questoes')
                     .select('*')
-                    .order('id', { ascending: false }); // Mostra as mais novas primeiro
+                    .order('id', { ascending: false });
                 
                 if (error) throw error;
                 bancoQuestoes = data;
@@ -91,14 +89,12 @@
             }
         }
 
-        // MOSTRA AS QUESTÕES NA TELA
         function renderizarQuestoes() {
             const container = document.getElementById('lista-questoes');
             container.innerHTML = '';
 
-            // Filtra as questões dinamicamente baseado no botão ativo
             const questoesFiltradas = bancoQuestoes.filter(q => {
-                if (filtroAtual === 'nao_resolvidas') return !resolvidas.includes(q.id);
+                if (filtroAtual === 'nao_resolvidas') return !certas.includes(q.id) && !erradas.includes(q.id);
                 if (filtroAtual === 'certas') return certas.includes(q.id);
                 if (filtroAtual === 'erradas') return erradas.includes(q.id);
                 return true; // 'todas'
@@ -110,8 +106,8 @@
             }
 
             questoesFiltradas.forEach((q) => {
-                const jaRespondeu = resolvidas.includes(q.id);
-                const foiCerta = certas.includes(q.id);
+                const acertouAinda = certas.includes(q.id);
+                const errouAinda = erradas.includes(q.id);
 
                 let card = document.createElement('div');
                 card.className = "bg-white p-6 rounded-lg shadow-sm border space-y-4";
@@ -123,10 +119,10 @@
                     
                     <div class="space-y-2" id="alternativas-${q.id}">
                         ${['a', 'b', 'c', 'd', 'e'].map(letra => {
-                            if(!q[`alternativa_${letra}`]) return ''; // Ignora se estiver em branco
+                            if(!q[`alternativa_${letra}`]) return '';
                             return `
                                 <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-gray-50 transition">
-                                    <input type="radio" name="q-${q.id}" value="${letra.toUpperCase()}" ${jaRespondeu ? 'disabled' : ''} class="w-4 h-4 text-blue-600">
+                                    <input type="radio" name="q-${q.id}" value="${letra.toUpperCase()}" ${acertouAinda ? 'disabled' : ''} class="w-4 h-4 text-blue-600">
                                     <span class="font-bold text-gray-500">${letra.toUpperCase()})</span>
                                     <span>${q[`alternativa_${letra}`]}</span>
                                 </label>
@@ -135,13 +131,16 @@
                     </div>
 
                     <div class="flex items-center gap-4">
-                        <button onclick="validarResposta(${q.id})" id="btn-${q.id}" ${jaRespondeu ? 'disabled class="hidden"' : 'class="bg-blue-600 text-white px-6 py-2 rounded font-semibold text-sm hover:bg-blue-700 transition"'}>
-                            Responder
-                        </button>
-                        ${jaRespondeu ? `<span class="text-sm font-bold ${foiCerta ? 'text-green-600' : 'text-red-600'}">${foiCerta ? '✓ Você acertou!' : '✕ Você errou!'}</span>` : ''}
+                        ${!acertouAinda ? `
+                            <button onclick="validarResposta(${q.id})" id="btn-${q.id}" class="bg-blue-600 text-white px-6 py-2 rounded font-semibold text-sm hover:bg-blue-700 transition">
+                                Responder
+                            </button>
+                        ` : ''}
+                        ${acertouAinda ? `<span class="text-sm font-bold text-green-600">✓ Você acertou!</span>` : ''}
+                        ${errouAinda && !acertouAinda ? `<span class="text-sm font-bold text-red-600">✕ Resposta incorreta! Tente novamente.</span>` : ''}
                     </div>
 
-                    <div id="explicacao-${q.id}" class="${jaRespondeu ? '' : 'hidden'} bg-yellow-50 border border-yellow-200 p-4 rounded-md mt-4 text-sm text-gray-700">
+                    <div id="explicacao-${q.id}" class="${acertouAinda ? '' : 'hidden'} bg-yellow-50 border border-yellow-200 p-4 rounded-md mt-4 text-sm text-gray-700">
                         <strong class="block text-yellow-800 mb-1">Explicação (Alternativa Correta: ${q.correta}):</strong>
                         ${q.explicacao}
                     </div>
@@ -150,7 +149,6 @@
             });
         }
 
-        // COMPUTA SE ERROU OU ACERTOU E SALVA NA MEMÓRIA DO NAVEGADOR
         function validarResposta(id) {
             const radioSelecionado = document.querySelector(`input[name="q-${id}"]:checked`);
             if (!radioSelecionado) {
@@ -161,15 +159,20 @@
             const respostaUsuario = radioSelecionado.value;
             const questao = bancoQuestoes.find(q => q.id === id);
 
-            resolvidas.push(id);
+            // Sempre soma 1 no contador geral histórico a cada clique de resposta
+            totalResolvidasContador++;
+            localStorage.setItem('gq_total_contador', totalResolvidasContador);
+
             if (respostaUsuario === questao.correta.toUpperCase()) {
-                certas.push(id);
+                // Se acertou, salva nas certas e remove das erradas se ela estivesse lá
+                if (!certas.includes(id)) certas.push(id);
+                erradas = erradas.filter(item => item !== id);
             } else {
-                erradas.push(id);
+                // Se errou, vai para as erradas (apenas se já não estiver lá)
+                if (!erradas.includes(id)) erradas.push(id);
             }
 
-            // Grava no LocalStorage do navegador
-            localStorage.setItem('gq_resolvidas', JSON.stringify(resolvidas));
+            // Grava o progresso das abas no navegador
             localStorage.setItem('gq_certas', JSON.stringify(certas));
             localStorage.setItem('gq_erradas', JSON.stringify(erradas));
 
@@ -177,25 +180,25 @@
             renderizarQuestoes();
         }
 
-        // RESETAR QUESTÕES (Zera absolutamente tudo nas abas e contadores)
+        // RESET INTELIGENTE: Limpa as abas de certas e erradas, mas NÃO mexe no contador histórico total
         function resetarProgresso() {
-            if(confirm("Deseja resetar o progresso? Isso limpará todas as suas certas, erradas e resolvidas.")) {
-                localStorage.clear();
-                resolvidas = []; certas = []; erradas = [];
+            if(confirm("Deseja limpar as abas? As questões voltarão para 'Não resolvidas', mas o seu contador histórico total será mantido nas estatísticas.")) {
+                certas = []; 
+                erradas = [];
+                localStorage.setItem('gq_certas', JSON.stringify(certas));
+                localStorage.setItem('gq_erradas', JSON.stringify(erradas));
                 atualizarContadores();
                 renderizarQuestoes();
             }
         }
 
-        // CONTADORES DA SEGUNDA ABA
         function atualizarContadores() {
-            document.getElementById('cont-total').innerText = resolvidas.length;
-            document.getElementById('stat-resolvidas').innerText = resolvidas.length;
+            document.getElementById('cont-total').innerText = totalResolvidasContador;
+            document.getElementById('stat-resolvidas').innerText = totalResolvidasContador;
             document.getElementById('stat-certas').innerText = certas.length;
             document.getElementById('stat-erradas').innerText = erradas.length;
         }
 
-        // LÓGICA VISUAL DOS FILTROS
         function filtrar(tipo) {
             filtroAtual = tipo;
             ['todas', 'nao_resolvidas', 'certas', 'erradas'].forEach(f => {
@@ -209,7 +212,6 @@
             renderizarQuestoes();
         }
 
-        // TROCAR DE ABA (Mudar para ver o contador)
         function mudarAba(aba) {
             if(aba === 'questoes') {
                 document.getElementById('aba-questoes').classList.remove('hidden');
@@ -224,7 +226,6 @@
             }
         }
 
-        // Inicia puxando o que já foi enviado pelo site de upload
         baixarQuestoes();
     </script>
 </body>
