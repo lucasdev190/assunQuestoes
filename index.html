@@ -32,17 +32,17 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Pesquisar por Matéria</label>
-                        <input type="text" id="busca-materia" oninput="renderizarQuestoes()" placeholder="Digite a matéria... Ex: Geografia" class="w-full p-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="text" id="busca-materia" oninput="limparTravaERenderizar()" placeholder="Digite a matéria... Ex: Geografia" class="w-full p-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Pesquisar por Assunto</label>
-                        <input type="text" id="busca-assunto" oninput="renderizarQuestoes()" placeholder="Digite o assunto... Ex: Clima" class="w-full p-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <input type="text" id="busca-assunto" oninput="limparTravaERenderizar()" placeholder="Digite o assunto... Ex: Clima" class="w-full p-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                 </div>
 
                 <hr class="border-gray-100">
 
-                <!-- Botões de Filtros de Status (Aba "Todas" removida aqui) -->
+                <!-- Botões de Filtros de Status -->
                 <div class="flex flex-wrap gap-2 items-center">
                     <button onclick="filtrar('nao_resolvidas')" id="filt-nao_resolvidas" class="px-4 py-1.5 rounded-full text-sm bg-blue-600 text-white font-medium">Não resolvidas</button>
                     <button onclick="filtrar('certas')" id="filt-certas" class="px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium">Certas</button>
@@ -86,10 +86,9 @@
         const bancoDeDados = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let bancoQuestoes = [];
-        // MODIFICADO: Agora o padrão ao abrir o site é listar as 'nao_resolvidas'
         let filtroAtual = 'nao_resolvidas';
         
-        // Mantém a trava presa APENAS quando respondida dentro da aba 'erradas'
+        // CORREÇÃO: Guarda temporariamente qualquer questão respondida na tela, independente da aba
         let questoesNaTelaQueForamRespondidas = [];
 
         // CARREGA O PROGRESSO DO NAVEGADOR
@@ -117,19 +116,19 @@
             const container = document.getElementById('lista-questoes');
             container.innerHTML = '';
 
-            // Pega os textos digitados nos inputs de pesquisa
             const buscaMateria = document.getElementById('busca-materia').value.toLowerCase().trim();
             const buscaAssunto = document.getElementById('busca-assunto').value.toLowerCase().trim();
 
             const questoesFiltradas = bancoQuestoes.filter(q => {
-                // 1. FILTRO DE TEXTO (Matéria e Assunto)
+                // 1. FILTRO DE TEXTO
                 const bateMateria = q.materia ? q.materia.toLowerCase().includes(buscaMateria) : true;
                 const bateAssunto = q.assunto ? q.assunto.toLowerCase().includes(buscaAssunto) : true;
                 if (!bateMateria || !bateAssunto) return false;
 
-                // 2. FILTRO DE STATUS DA ABA + TRAVA INTELIGENTE NA ABA ERRADAS
-                if (filtroAtual === 'erradas' && questoesNaTelaQueForamRespondidas.includes(q.id)) return true;
+                // 2. TRAVA INTELIGENTE GERAL: Se foi respondida agorinha na tela, ela fica visível obrigatoriamente
+                if (questoesNaTelaQueForamRespondidas.includes(q.id)) return true;
 
+                // 3. FILTRO PADRÃO DAS ABAS
                 if (filtroAtual === 'nao_resolvidas') return !certas.includes(q.id) && !erradas.includes(q.id);
                 if (filtroAtual === 'certas') return certas.includes(q.id);
                 if (filtroAtual === 'erradas') return erradas.includes(q.id);
@@ -201,8 +200,8 @@
             totalResolvidasContador++;
             localStorage.setItem('gq_total_contador', totalResolvidasContador);
 
-            // A trava só é ativada se você estiver respondendo dentro da aba de erradas
-            if (filtroAtual === 'erradas' && !questoesNaTelaQueForamRespondidas.includes(id)) {
+            // CORREÇÃO: Prende a questão na tela ativa em qualquer aba que você responder
+            if (!questoesNaTelaQueForamRespondidas.includes(id)) {
                 questoesNaTelaQueForamRespondidas.push(id);
             }
 
@@ -218,27 +217,28 @@
 
             atualizarContadores();
             
+            // ATUALIZAÇÃO CIRÚRGICA: Evita re-renderizar a página inteira para o card não sumir
             const acertouAgora = certas.includes(id);
+            const areaFeedback = document.getElementById(`feedback-area-${id}`);
             
-            // Se o usuário responder na aba de "Não resolvidas" e acertar ou errar, re-renderiza para mover o card
-            if (filtroAtual === 'nao_resolvidas') {
-                renderizarQuestoes();
+            if (acertouAgora) {
+                areaFeedback.innerHTML = `<span class="text-sm font-bold text-green-600">✓ Você acertou!</span>`;
+                document.querySelectorAll(`input[name="q-${id}"]`).forEach(input => input.disabled = true);
+                document.getElementById(`explicacao-${id}`).classList.remove('hidden');
             } else {
-                // Se estiver na aba erradas, roda a trava cirúrgica para deixar ele ler a explicação
-                const areaFeedback = document.getElementById(`feedback-area-${id}`);
-                if (acertouAgora) {
-                    areaFeedback.innerHTML = `<span class="text-sm font-bold text-green-600">✓ Você acertou!</span>`;
-                    document.querySelectorAll(`input[name="q-${id}"]`).forEach(input => input.disabled = true);
-                    document.getElementById(`explicacao-${id}`).classList.remove('hidden');
-                } else {
-                    areaFeedback.innerHTML = `
-                        <button onclick="validarResposta(${id})" id="btn-${id}" class="bg-blue-600 text-white px-6 py-2 rounded font-semibold text-sm hover:bg-blue-700 transition">
-                            Responder
-                        </button>
-                        <span class="text-sm font-bold text-red-600">✕ Resposta incorreta! Tente novamente.</span>
-                    `;
-                }
+                areaFeedback.innerHTML = `
+                    <button onclick="validarResposta(${id})" id="btn-${id}" class="bg-blue-600 text-white px-6 py-2 rounded font-semibold text-sm hover:bg-blue-700 transition">
+                        Responder
+                    </button>
+                    <span class="text-sm font-bold text-red-600">✕ Resposta incorreta! Tente novamente.</span>
+                `;
             }
+        }
+
+        // Nova função auxiliar: Se você começar a digitar na busca, limpa os cards presos antigos
+        function limparTravaERenderizar() {
+            questoesNaTelaQueForamRespondidas = [];
+            renderizarQuestoes();
         }
 
         function resetarProgresso() {
@@ -262,7 +262,7 @@
 
         function filtrar(tipo) {
             filtroAtual = tipo;
-            questoesNaTelaQueForamRespondidas = []; // Libera a trava antiga ao trocar de filtro
+            questoesNaTelaQueForamRespondidas = []; // Libera o "imã" ao trocar de filtro voluntariamente
             
             ['nao_resolvidas', 'certas', 'erradas'].forEach(f => {
                 const btn = document.getElementById(`filt-${f}`);
@@ -276,7 +276,7 @@
         }
 
         function mudarAba(aba) {
-            questoesNaTelaQueForamRespondidas = [];
+            questoesNaTelaQueForamRespondidas = []; // Libera o "imã" ao trocar para a aba de estatísticas
             
             if(aba === 'questoes') {
                 document.getElementById('aba-questoes').classList.remove('hidden');
