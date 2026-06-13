@@ -9,6 +9,7 @@
 </head>
 <body class="bg-gray-50 min-h-screen text-gray-800">
 
+    <!-- BARRA DE NAVEGAÇÃO SUPERIOR -->
     <nav class="bg-white shadow-sm border-b p-4 mb-6">
         <div class="max-w-5xl mx-auto flex justify-between items-center">
             <h1 class="text-xl font-bold text-blue-600">Meu Painel de Estudos</h1>
@@ -21,10 +22,28 @@
 
     <main class="max-w-5xl mx-auto px-4">
         
+        <!-- ================= ABA DE QUESTÕES ================= -->
         <div id="aba-questoes" class="space-y-6">
             
+            <!-- BARRA DE PESQUISA E FILTROS -->
             <div class="bg-white p-6 rounded-lg shadow-sm border space-y-4">
-                <div class="flex flex-wrap gap-2">
+                
+                <!-- Campos de Busca por Matéria e Assunto -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Pesquisar por Matéria</label>
+                        <input type="text" id="busca-materia" oninput="renderizarQuestoes()" placeholder="Digite a matéria... Ex: Geografia" class="w-full p-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Pesquisar por Assunto</label>
+                        <input type="text" id="busca-assunto" oninput="renderizarQuestoes()" placeholder="Digite o assunto... Ex: Clima" class="w-full p-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <hr class="border-gray-100">
+
+                <!-- Botões de Filtros de Status -->
+                <div class="flex flex-wrap gap-2 items-center">
                     <button onclick="filtrar('todas')" id="filt-todas" class="px-4 py-1.5 rounded-full text-sm bg-blue-600 text-white font-medium">Todas as questões</button>
                     <button onclick="filtrar('nao_resolvidas')" id="filt-nao_resolvidas" class="px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium">Não resolvidas</button>
                     <button onclick="filtrar('certas')" id="filt-certas" class="px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium">Certas</button>
@@ -33,11 +52,13 @@
                 </div>
             </div>
 
+            <!-- CONTAINER DAS QUESTÕES DINÂMICAS -->
             <div id="lista-questoes" class="space-y-6">
                 <p class="text-gray-500 text-center py-8">Carregando questões do banco de dados...</p>
             </div>
         </div>
 
+        <!-- ================= ABA SEPARADA: CONTADOR / DESEMPENHO ================= -->
         <div id="aba-estatisticas" class="hidden bg-white p-8 rounded-lg shadow-sm border max-w-xl mx-auto">
             <h2 class="text-2xl font-bold mb-6 text-gray-800">Seu Histórico de Questões</h2>
             <div class="grid grid-cols-3 gap-4 text-center">
@@ -68,8 +89,7 @@
         let bancoQuestoes = [];
         let filtroAtual = 'todas';
         
-        // Essa lista vai guardar temporariamente quais questões o usuário acabou de responder na tela ATUAL
-        // Evitando que elas sumam da visão antes dele mudar de filtro ou aba
+        // Mantém a trava presa APENAS quando respondida dentro da aba 'erradas'
         let questoesNaTelaQueForamRespondidas = [];
 
         // CARREGA O PROGRESSO DO NAVEGADOR
@@ -97,9 +117,19 @@
             const container = document.getElementById('lista-questoes');
             container.innerHTML = '';
 
+            // Pega os textos digitados nos inputs de pesquisa (convertendo para minúsculo)
+            const buscaMateria = document.getElementById('busca-materia').value.toLowerCase().trim();
+            const buscaAssunto = document.getElementById('busca-assunto').value.toLowerCase().trim();
+
             const questoesFiltradas = bancoQuestoes.filter(q => {
-                // TRAVA INTELIGENTE: Se a questão foi respondida AGORA nessa tela, não deixa ela sumir mesmo que o filtro mude de estado
-                if (questoesNaTelaQueForamRespondidas.includes(q.id)) return true;
+                // 1. FILTRO DE TEXTO (Matéria e Assunto)
+                const bateMateria = q.materia ? q.materia.toLowerCase().includes(buscaMateria) : true;
+                const bateAssunto = q.assunto ? q.assunto.toLowerCase().includes(buscaAssunto) : true;
+                if (!bateMateria || !bateAssunto) return false;
+
+                // 2. FILTRO DE STATUS DA ABA + TRAVA INTELIGENTE
+                // Removida a trava na aba 'todas': agora ela só age se você responder dentro da aba de 'erradas'
+                if (filtroAtual === 'erradas' && questoesNaTelaQueForamRespondidas.includes(q.id)) return true;
 
                 if (filtroAtual === 'nao_resolvidas') return !certas.includes(q.id) && !erradas.includes(q.id);
                 if (filtroAtual === 'certas') return certas.includes(q.id);
@@ -108,7 +138,7 @@
             });
 
             if (questoesFiltradas.length === 0) {
-                container.innerHTML = '<p class="text-gray-400 text-center py-8">Nenhuma questão encontrada nesta aba.</p>';
+                container.innerHTML = '<p class="text-gray-400 text-center py-8">Nenhuma questão encontrada com esses filtros ou buscas.</p>';
                 return;
             }
 
@@ -120,10 +150,11 @@
                 card.className = "bg-white p-6 rounded-lg shadow-sm border space-y-4";
                 card.innerHTML = `
                     <div class="text-xs text-blue-600 font-semibold space-x-2">
-                        <span>#${q.id}</span> • <span>${q.materia}</span> • <span>${q.assunto}</span>
+                        <span>#${q.id}</span> • <span class="bg-blue-50 px-2 py-0.5 rounded text-blue-700">${q.materia}</span> • <span class="bg-gray-100 px-2 py-0.5 rounded text-gray-700">${q.assunto}</span>
                     </div>
                     <div class="text-gray-800 text-base font-medium whitespace-pre-line">${q.enunciado}</div>
                     
+                    <!-- Alternativas -->
                     <div class="space-y-2" id="alternativas-${q.id}">
                         ${['a', 'b', 'c', 'd', 'e'].map(letra => {
                             if(!q[`alternativa_${letra}`]) return '';
@@ -137,6 +168,7 @@
                         }).join('')}
                     </div>
 
+                    <!-- Botão Responder / Feedback -->
                     <div class="flex items-center gap-4" id="feedback-area-${q.id}">
                         ${!acertouAinda ? `
                             <button onclick="validarResposta(${q.id})" id="btn-${q.id}" class="bg-blue-600 text-white px-6 py-2 rounded font-semibold text-sm hover:bg-blue-700 transition">
@@ -147,6 +179,7 @@
                         ${errouAinda && !acertouAinda ? `<span class="text-sm font-bold text-red-600">✕ Resposta incorreta! Tente novamente.</span>` : ''}
                     </div>
 
+                    <!-- Caixa de explicação -->
                     <div id="explicacao-${q.id}" class="${acertouAinda ? '' : 'hidden'} bg-yellow-50 border border-yellow-200 p-4 rounded-md mt-4 text-sm text-gray-700">
                         <strong class="block text-yellow-800 mb-1">Explicação (Alternativa Correta: ${q.correta}):</strong>
                         ${q.explicacao}
@@ -169,8 +202,8 @@
             totalResolvidasContador++;
             localStorage.setItem('gq_total_contador', totalResolvidasContador);
 
-            // Adiciona na lista temporária para prender a questão na tela atual do usuário
-            if (!questoesNaTelaQueForamRespondidas.includes(id)) {
+            // A trava só é ativada se você estiver respondendo DE DENTRO da aba de erradas
+            if (filtroAtual === 'erradas' && !questoesNaTelaQueForamRespondidas.includes(id)) {
                 questoesNaTelaQueForamRespondidas.push(id);
             }
 
@@ -186,25 +219,27 @@
 
             atualizarContadores();
             
-            // Em vez de recriar a lista inteira do zero (o que faria a questão sumir), 
-            // nós atualizamos apenas o card específico visualmente!
+            // LÓGICA DE ATUALIZAÇÃO VISUAL EM TEMPO REAL
             const acertouAgora = certas.includes(id);
             
-            // Atualiza a área do botão
-            const areaFeedback = document.getElementById(`feedback-area-${id}`);
-            if (acertouAgora) {
-                areaFeedback.innerHTML = `<span class="text-sm font-bold text-green-600">✓ Você acertou!</span>`;
-                // Desativa os inputs de rádio para congelar na certa
-                document.querySelectorAll(`input[name="q-${id}"]`).forEach(input => input.disabled = true);
-                // Revela a caixinha amarela de explicação
-                document.getElementById(`explicacao-${id}`).classList.remove('hidden');
+            if (filtroAtual === 'todas' && acertouAgora) {
+                // Na aba 'todas', nós re-renderizamos completo para mover as coisas e atualizar sem prender nada
+                renderizarQuestoes();
             } else {
-                areaFeedback.innerHTML = `
-                    <button onclick="validarResposta(${id})" id="btn-${id}" class="bg-blue-600 text-white px-6 py-2 rounded font-semibold text-sm hover:bg-blue-700 transition">
-                        Responder
-                    </button>
-                    <span class="text-sm font-bold text-red-600">✕ Resposta incorreta! Tente novamente.</span>
-                `;
+                // Nas outras abas (ou em caso de erro), atualiza cirurgicamente o card na tela
+                const areaFeedback = document.getElementById(`feedback-area-${id}`);
+                if (acertouAgora) {
+                    areaFeedback.innerHTML = `<span class="text-sm font-bold text-green-600">✓ Você acertou!</span>`;
+                    document.querySelectorAll(`input[name="q-${id}"]`).forEach(input => input.disabled = true);
+                    document.getElementById(`explicacao-${id}`).classList.remove('hidden');
+                } else {
+                    areaFeedback.innerHTML = `
+                        <button onclick="validarResposta(${id})" id="btn-${id}" class="bg-blue-600 text-white px-6 py-2 rounded font-semibold text-sm hover:bg-blue-700 transition">
+                            Responder
+                        </button>
+                        <span class="text-sm font-bold text-red-600">✕ Resposta incorreta! Tente novamente.</span>
+                    `;
+                }
             }
         }
 
@@ -212,7 +247,7 @@
             if(confirm("Deseja limpar as abas? As questões voltarão para 'Não resolvidas', mas o seu contador histórico total será mantido nas estatísticas.")) {
                 certas = []; 
                 erradas = [];
-                questoesNaTelaQueForamRespondidas = []; // Limpa a trava
+                questoesNaTelaQueForamRespondidas = [];
                 localStorage.setItem('gq_certas', JSON.stringify(certas));
                 localStorage.setItem('gq_erradas', JSON.stringify(erradas));
                 atualizarContadores();
@@ -227,10 +262,9 @@
             document.getElementById('stat-erradas').innerText = erradas.length;
         }
 
-        // QUANDO CLICA EM UM FILTRO, LIMPA A TRAVA DA TELA ANTERIOR
         function filtrar(tipo) {
             filtroAtual = tipo;
-            questoesNaTelaQueForamRespondidas = []; // Libera as questões para irem aos seus novos lugares
+            questoesNaTelaQueForamRespondidas = []; // Libera a trava antiga ao trocar de filtro
             
             ['todas', 'nao_resolvidas', 'certas', 'erradas'].forEach(f => {
                 const btn = document.getElementById(`filt-${f}`);
@@ -243,16 +277,15 @@
             renderizarQuestoes();
         }
 
-        // QUANDO MUDA DE ABA, LIMPA A TRAVA TAMBÉM
         function mudarAba(aba) {
-            questoesNaTelaQueForamRespondidas = []; // Libera a trava
+            questoesNaTelaQueForamRespondidas = []; // Libera a trava ao trocar de aba principal
             
             if(aba === 'questoes') {
                 document.getElementById('aba-questoes').classList.remove('hidden');
                 document.getElementById('aba-estatisticas').classList.add('hidden');
                 document.getElementById('btn-aba-questoes').className = "font-semibold text-blue-600 border-b-2 border-blue-600 pb-1";
                 document.getElementById('btn-aba-estatisticas').className = "font-semibold text-gray-500 hover:text-blue-600 pb-1";
-                renderizarQuestoes(); // Re-renderiza para aplicar a limpeza da trava
+                renderizarQuestoes();
             } else {
                 document.getElementById('aba-questoes').classList.add('hidden');
                 document.getElementById('aba-estatisticas').classList.remove('hidden');
