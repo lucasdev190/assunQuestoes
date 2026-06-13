@@ -11,7 +11,7 @@
 
     <nav class="bg-white shadow-sm border-b p-4 mb-6">
         <div class="max-w-5xl mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-bold text-blue-600">GranQuestões Clone</h1>
+            <h1 class="text-xl font-bold text-blue-600">Meu Painel de Estudos</h1>
             <div class="flex gap-4">
                 <button onclick="mudarAba('questoes')" id="btn-aba-questoes" class="font-semibold text-blue-600 border-b-2 border-blue-600 pb-1">Questões</button>
                 <button onclick="mudarAba('estatisticas')" id="btn-aba-estatisticas" class="font-semibold text-gray-500 hover:text-blue-600 pb-1">Estatísticas (<span id="cont-total">0</span>)</button>
@@ -39,7 +39,7 @@
         </div>
 
         <div id="aba-estatisticas" class="hidden bg-white p-8 rounded-lg shadow-sm border max-w-xl mx-auto">
-            <h2 class="text-2xl font-bold mb-6 text-gray-800">Seu Desempenho</h2>
+            <h2 class="text-2xl font-bold mb-6 text-gray-800">Seu Histórico de Questões</h2>
             <div class="grid grid-cols-3 gap-4 text-center">
                 <div class="bg-blue-50 p-4 rounded-lg">
                     <span class="block text-2xl font-bold text-blue-600" id="stat-resolvidas">0</span>
@@ -59,40 +59,44 @@
     </main>
 
     <script>
-       // CONFIGURAÇÃO DO SUPABASE
-       const SUPABASE_URL = "https://ykampvnnrkwvraxanunm.supabase.co";
-       const SUPABASE_ANON_KEY = "sb_publishable_bRqoO7pDDq5qC8RvSklJGA_IaHCerUH";
+        // CONFIGURAÇÃO DO SUPABASE
+        const SUPABASE_URL = "https://ykampvnnrkwvraxanunm.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrYW1wdm5ucmt3dnJheGFudW5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTY1MzMsImV4cCI6MjA5Njg3MjUzM30.CScVluXVuZQ31zLWolNFLREz4mH-Cu-YGxlw6YrfeY8"; 
 
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // Usando a variável limpa 'bancoDeDados' para evitar o erro de SyntaxError
+        const bancoDeDados = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // VARIÁVEIS DE ESTADO DO SISTEMA
         let bancoQuestoes = [];
         let filtroAtual = 'todas';
 
-        // CARREGAR DADOS DO LOCALSTORAGE
+        // Puxa o progresso salvo na memória do navegador (LocalStorage)
         let resolvidas = JSON.parse(localStorage.getItem('gq_resolvidas')) || [];
         let certas = JSON.parse(localStorage.getItem('gq_certas')) || [];
         let erradas = JSON.parse(localStorage.getItem('gq_erradas')) || [];
 
-        // BUSCAR QUESTÕES DO SUPABASE ASSIM QUE ENTRAR
+        // BUSCA AS QUESTÕES DO SUPABASE
         async function baixarQuestoes() {
             try {
-                const { data, error } = await supabase.from('questoes').select('*').order('id', { ascending: false });
+                const { data, error } = await bancoDeDados
+                    .from('questoes')
+                    .select('*')
+                    .order('id', { ascending: false }); // Mostra as mais novas primeiro
+                
                 if (error) throw error;
                 bancoQuestoes = data;
                 renderizarQuestoes();
                 atualizarContadores();
             } catch (error) {
-                document.getElementById('lista-questoes').innerHTML = `<p class="text-red-500 text-center">Erro ao carregar dados: ${error.message}</p>`;
+                document.getElementById('lista-questoes').innerHTML = `<p class="text-red-500 text-center">Erro ao carregar dados do banco: ${error.message}</p>`;
             }
         }
 
-        // REDERIZAR QUESTÕES NA TELA
+        // MOSTRA AS QUESTÕES NA TELA
         function renderizarQuestoes() {
             const container = document.getElementById('lista-questoes');
             container.innerHTML = '';
 
-            // Filtrar array antes de exibir
+            // Filtra as questões dinamicamente baseado no botão ativo
             const questoesFiltradas = bancoQuestoes.filter(q => {
                 if (filtroAtual === 'nao_resolvidas') return !resolvidas.includes(q.id);
                 if (filtroAtual === 'certas') return certas.includes(q.id);
@@ -101,11 +105,11 @@
             });
 
             if (questoesFiltradas.length === 0) {
-                container.innerHTML = '<p class="text-gray-400 text-center py-8">Nenhuma questão encontrada nesta categoria.</p>';
+                container.innerHTML = '<p class="text-gray-400 text-center py-8">Nenhuma questão encontrada nesta aba.</p>';
                 return;
             }
 
-            questoesFiltradas.forEach((q, index) => {
+            questoesFiltradas.forEach((q) => {
                 const jaRespondeu = resolvidas.includes(q.id);
                 const foiCerta = certas.includes(q.id);
 
@@ -119,7 +123,7 @@
                     
                     <div class="space-y-2" id="alternativas-${q.id}">
                         ${['a', 'b', 'c', 'd', 'e'].map(letra => {
-                            if(!q[`alternativa_${letra}`]) return ''; // Pula se não houver a alternativa
+                            if(!q[`alternativa_${letra}`]) return ''; // Ignora se estiver em branco
                             return `
                                 <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-gray-50 transition">
                                     <input type="radio" name="q-${q.id}" value="${letra.toUpperCase()}" ${jaRespondeu ? 'disabled' : ''} class="w-4 h-4 text-blue-600">
@@ -138,7 +142,7 @@
                     </div>
 
                     <div id="explicacao-${q.id}" class="${jaRespondeu ? '' : 'hidden'} bg-yellow-50 border border-yellow-200 p-4 rounded-md mt-4 text-sm text-gray-700">
-                        <strong class="block text-yellow-800 mb-1">Gabarito comentado (Alternativa ${q.correta}):</strong>
+                        <strong class="block text-yellow-800 mb-1">Explicação (Alternativa Correta: ${q.correta}):</strong>
                         ${q.explicacao}
                     </div>
                 `;
@@ -146,11 +150,11 @@
             });
         }
 
-        // VERIFICAR ACERTO OU ERRO
+        // COMPUTA SE ERROU OU ACERTOU E SALVA NA MEMÓRIA DO NAVEGADOR
         function validarResposta(id) {
             const radioSelecionado = document.querySelector(`input[name="q-${id}"]:checked`);
             if (!radioSelecionado) {
-                alert("Por favor, selecione uma alternativa antes de responder!");
+                alert("Selecione uma alternativa primeiro!");
                 return;
             }
 
@@ -164,7 +168,7 @@
                 erradas.push(id);
             }
 
-            // Salva o progresso
+            // Grava no LocalStorage do navegador
             localStorage.setItem('gq_resolvidas', JSON.stringify(resolvidas));
             localStorage.setItem('gq_certas', JSON.stringify(certas));
             localStorage.setItem('gq_erradas', JSON.stringify(erradas));
@@ -173,9 +177,9 @@
             renderizarQuestoes();
         }
 
-        // RESETAR PROGRESSO (ZERA TUDO NO NAVEGADOR)
+        // RESETAR QUESTÕES (Zera absolutamente tudo nas abas e contadores)
         function resetarProgresso() {
-            if(confirm("Tem certeza que deseja limpar todo o seu progresso, acertos e erros?")) {
+            if(confirm("Deseja resetar o progresso? Isso limpará todas as suas certas, erradas e resolvidas.")) {
                 localStorage.clear();
                 resolvidas = []; certas = []; erradas = [];
                 atualizarContadores();
@@ -183,7 +187,7 @@
             }
         }
 
-        // ATUALIZAR NÚMEROS DAS ABAS
+        // CONTADORES DA SEGUNDA ABA
         function atualizarContadores() {
             document.getElementById('cont-total').innerText = resolvidas.length;
             document.getElementById('stat-resolvidas').innerText = resolvidas.length;
@@ -191,7 +195,7 @@
             document.getElementById('stat-erradas').innerText = erradas.length;
         }
 
-        // CONTROLAR SISTEMA DE FILTROS NA TELA
+        // LÓGICA VISUAL DOS FILTROS
         function filtrar(tipo) {
             filtroAtual = tipo;
             ['todas', 'nao_resolvidas', 'certas', 'erradas'].forEach(f => {
@@ -205,7 +209,7 @@
             renderizarQuestoes();
         }
 
-        // TROCAR ENTRE ABA DE QUESTÕES E DE CONTADOR (ESTATÍSTICAS)
+        // TROCAR DE ABA (Mudar para ver o contador)
         function mudarAba(aba) {
             if(aba === 'questoes') {
                 document.getElementById('aba-questoes').classList.remove('hidden');
@@ -220,7 +224,7 @@
             }
         }
 
-        // Inicializar aplicação ao abrir a página
+        // Inicia puxando o que já foi enviado pelo site de upload
         baixarQuestoes();
     </script>
 </body>
