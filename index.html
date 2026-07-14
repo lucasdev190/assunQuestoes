@@ -388,25 +388,44 @@
                     </div>
                     <div class="text-gray-800 text-base font-medium whitespace-pre-line">${q.enunciado}</div>
                     
-                    <!-- Alternativas -->
+                    <!-- Alternativas Embaralhadas Dinamicamente -->
                     <div class="space-y-2" id="alternativas-${q.id}">
-                        ${['a', 'b', 'c', 'd', 'e'].map(letra => {
-                            if(!q[`alternativa_${letra}`]) return '';
-                            const idUnicoRisco = `texto-${q.id}-${letra}`;
-                            return `
-                                <div class="flex items-center gap-2 w-full">
-                                    <button onclick="alternarRisco('${idUnicoRisco}')" title="Eliminar alternativa" class="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-red-500 transition text-sm">
-                                        ✂️
-                                    </button>
-                                    
-                                    <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-gray-50 transition w-full">
-                                        <input type="radio" name="q-${q.id}" value="${letra.toUpperCase()}" ${travarInputs ? 'disabled' : ''} class="w-4 h-4 text-blue-600">
-                                        <span class="font-bold text-gray-500">${letra.toUpperCase()})</span>
-                                        <span id="${idUnicoRisco}">${q[`alternativa_${letra}`]}</span>
-                                    </label>
-                                </div>
-                            `;
-                        }).join('')}
+                        ${(() => {
+                            // 1. Coleta apenas as alternativas que existem no banco para esta questão
+                            const listaOriginal = [];
+                            ['a', 'b', 'c', 'd', 'e'].forEach(letra => {
+                                if (q[`alternativa_${letra}`]) {
+                                    listaOriginal.push({
+                                        chaveOriginal: letra,
+                                        texto: q[`alternativa_${letra}`]
+                                    });
+                                }
+                            });
+
+                            // 2. Cria uma cópia e embaralha usando o Fisher-Yates que já existe no seu código
+                            const listaEmbaralhada = embaralhar([...listaOriginal]);
+
+                            // 3. Renderiza o HTML com letras sequenciais (A, B, C...), mas mantendo o value original
+                            const letrasVisuais = ['A', 'B', 'C', 'D', 'E'];
+                            return listaEmbaralhada.map((item, index) => {
+                                const idUnicoRisco = `texto-${q.id}-${item.chaveOriginal}`;
+                                const letraExibida = letrasVisuais[index]; // Sempre mostra A, B, C, D, E em ordem
+
+                                return `
+                                    <div class="flex items-center gap-2 w-full">
+                                        <button onclick="alternarRisco('${idUnicoRisco}')" title="Eliminar alternativa" class="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-red-500 transition text-sm">
+                                            ✂️
+                                        </button>
+                                        
+                                        <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-gray-50 transition w-full">
+                                            <input type="radio" name="q-${q.id}" value="${item.chaveOriginal.toUpperCase()}" ${travarInputs ? 'disabled' : ''} class="w-4 h-4 text-blue-600">
+                                            <span class="font-bold text-gray-500">${letraExibida})</span>
+                                            <span id="${idUnicoRisco}">${item.texto}</span>
+                                        </label>
+                                    </div>
+                                `;
+                            }).join('');
+                        })()}
                     </div>
 
                     <!-- Botão Responder / Feedback -->
@@ -422,7 +441,7 @@
 
                     <!-- Caixa de explicação -->
                     <div id="explicacao-${q.id}" class="${mostrarExplicacao ? '' : 'hidden'} bg-yellow-50 border border-yellow-200 p-4 rounded-md mt-4 text-sm text-gray-700">
-                        <strong class="block text-yellow-800 mb-1">Explicação (Alternativa Correta: ${q.correta}):</strong>
+                        <strong class="block text-yellow-800 mb-1">Explicação (Alternativa Correta: ${q.correta.toUpperCase()}):</strong>
                         ${q.explicacao}
                     </div>
                 `;
