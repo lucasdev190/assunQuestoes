@@ -299,12 +299,11 @@
             return array;
         }
 
-        async function baixarQuestoes() {
+       async function baixarQuestoes() {
             try {
                 const { data, error } = await bancoDeDados
                     .from('questoes')
-                    .select('*')
-                    .range(0, 5000); // <-- ISSO AQUI resolve o problema! Garante que busca até 5000 questões.
+                    .select('*');
                 
                 if (error) throw error;
                 
