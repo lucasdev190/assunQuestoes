@@ -12,14 +12,31 @@
             text-decoration: line-through;
             color: #9ca3af; /* Deixa o texto cinza claro */
         }
+        /* Animação suave para a entrada da notificação flutuante */
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px) scale(0.95);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+        }
+        .animar-toast {
+            animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen text-gray-800">
+<body class="bg-gray-50 min-h-screen text-gray-800 relative">
+
+    <!-- CONTAINER DAS NOTIFICAÇÕES FLUTUANTES (TOASTS) -->
+    <div id="container-notificacoes" class="fixed top-4 right-4 z-50 space-y-3 max-w-sm w-full pointer-events-none"></div>
 
     <!-- ================= TELA DE LOGIN / CADASTRO ================= -->
     <div id="tela-login" class="flex min-h-screen items-center justify-center px-4">
         <div class="bg-white p-8 rounded-lg shadow-md border max-w-md w-full space-y-6">
-            <h2 id="login-titulo" class="text-2xl font-bold text-center text-blue-600">Entrar no Painel</h2>
+            <h2 id="login-titulo" class="text-2xl font-bold text-center text-blue-600">Plataforma de Questões</h2>
             
             <form id="form-auth" onsubmit="manipularAutenticacao(event)" class="space-y-4">
                 <div>
@@ -49,7 +66,7 @@
         <!-- BARRA DE NAVEGAÇÃO SUPERIOR -->
         <nav class="bg-white shadow-sm border-b p-4 mb-6">
             <div class="max-w-5xl mx-auto flex justify-between items-center">
-                <h1 class="text-xl font-bold text-blue-600">Meu Painel de Estudos</h1>
+                <h1 class="text-xl font-bold text-blue-600">Plataforma de Questões</h1>
                 <div class="flex gap-4 items-center">
                     <button onclick="mudarAba('questoes')" id="btn-aba-questoes" class="font-semibold text-blue-600 border-b-2 border-blue-600 pb-1">Questões</button>
                     <button onclick="mudarAba('estatisticas')" id="btn-aba-estatisticas" class="font-semibold text-gray-500 hover:text-blue-600 pb-1">Estatísticas (<span id="cont-total">0</span>)</button>
@@ -139,6 +156,44 @@
         let certas = JSON.parse(localStorage.getItem('gq_certas')) || [];
         let erradas = JSON.parse(localStorage.getItem('gq_erradas')) || [];
 
+
+        // ================= FUNÇÃO DE MENSAGEM FLUTUANTE CUSTOMIZADA (TOASTS) =================
+        function mostrarToast(mensagem, tipo = 'sucesso') {
+            const container = document.getElementById('container-notificacoes');
+            
+            // Definição de cores e ícones baseados no tipo do toast
+            let config = {
+                bg: 'bg-green-500',
+                icone: '✨'
+            };
+            
+            if (tipo === 'erro') {
+                config.bg = 'bg-red-500';
+                config.icone = '⚠️';
+            } else if (tipo === 'aviso') {
+                config.bg = 'bg-yellow-500';
+                config.icone = 'ℹ️';
+            }
+
+            // Criar o elemento do Toast
+            const toast = document.createElement('div');
+            toast.className = `animar-toast pointer-events-auto flex items-center p-4 rounded-lg shadow-lg text-white ${config.bg} font-medium text-sm space-x-3 transition duration-300 transform`;
+            toast.innerHTML = `
+                <span class="text-lg">${config.icone}</span>
+                <span class="flex-1">${mensagem}</span>
+                <button onclick="this.parentElement.remove()" class="hover:opacity-75 transition font-bold text-sm">✕</button>
+            `;
+
+            container.appendChild(toast);
+
+            // Deletar o Toast automaticamente após 4 segundos
+            setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+
         // ================= FUNÇÕES DE AUTENTICAÇÃO (SESSÃO) =================
 
         // Alternar entre tela de login e cadastro
@@ -155,7 +210,7 @@
                 txtAlternar.innerText = "Já tem uma conta?";
                 btnAlternar.innerText = "Entre aqui";
             } else {
-                titulo.innerText = "Entrar no Painel";
+                titulo.innerText = "Plataforma de Questões";
                 botaoEnviar.innerText = "Entrar";
                 txtAlternar.innerText = "Não tem uma conta?";
                 btnAlternar.innerText = "Cadastre-se";
@@ -181,7 +236,7 @@
                     });
                     if (error) throw error;
                     
-                    alert("Cadastro realizado com sucesso! Se configurado, confirme seu e-mail ou faça login.");
+                    mostrarToast("Cadastro realizado! Confirme o e-mail ou faça seu login.", "sucesso");
                     alternarModoAuth();
                 } else {
                     const { data, error } = await bancoDeDados.auth.signInWithPassword({
@@ -189,9 +244,10 @@
                         password: senha,
                     });
                     if (error) throw error;
+                    mostrarToast("Login realizado com sucesso! Bem-vindo.", "sucesso");
                 }
             } catch (error) {
-                alert("Erro na autenticação: " + error.message);
+                mostrarToast(error.message, "erro");
             } finally {
                 botao.disabled = false;
                 botao.innerText = modoCadastro ? "Cadastrar" : "Entrar";
@@ -221,6 +277,7 @@
         // Função para Deslogar o usuário
         async function deslogar() {
             await bancoDeDados.auth.signOut();
+            mostrarToast("Você saiu da plataforma.", "aviso");
         }
 
         // ================= FUNÇÕES DO BANCO DE DADOS E RENDERS =================
@@ -349,7 +406,7 @@
         function validarResposta(id) {
             const radioSelecionado = document.querySelector(`input[name="q-${id}"]:checked`);
             if (!radioSelecionado) {
-                alert("Selecione uma alternativa primeiro!");
+                mostrarToast("Selecione uma alternativa antes de responder!", "aviso");
                 return;
             }
 
@@ -368,11 +425,13 @@
             if (acertouAgora) {
                 if (!certas.includes(id)) certas.push(id);
                 erradas = erradas.filter(item => item !== id);
+                mostrarToast("Excelente! Alternativa correta.", "sucesso");
             } else {
                 if (!erradas.includes(id)) erradas.push(id);
                 if (filtroAtual === 'erradas' && !questoesRespondidasNaAbaErradasAgora.includes(id)) {
                     questoesRespondidasNaAbaErradasAgora.push(id);
                 }
+                mostrarToast("Que pena, alternativa incorreta! Estude a explicação.", "erro");
             }
 
             localStorage.setItem('gq_certas', JSON.stringify(certas));
@@ -411,6 +470,7 @@
                 localStorage.setItem('gq_erradas', JSON.stringify(erradas));
                 atualizarContadores();
                 renderizarQuestoes();
+                mostrarToast("Abas de progresso resetadas com sucesso!", "sucesso");
             }
         }
 
