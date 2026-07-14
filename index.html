@@ -152,7 +152,7 @@
         // Guarda quais questões foram respondidas DE FATO nesta rodada atual da aba erradas
         let questoesRespondidasNaAbaErradasAgora = [];
 
-        // ARRAYS DE CONTROLE DE PROGRESSO (AGORA ALIMENTADOS PELO BANCO DE DADOS)
+        // ARRAYS DE CONTROLE DE PROGRESSO (ALIMENTADOS PELO BANCO DE DADOS)
         let totalResolvidasContador = 0;
         let certas = [];
         let erradas = [];
@@ -195,11 +195,12 @@
         // ================= FUNÇÕES DE AUTENTICAÇÃO (SESSÃO) =================
 
         function alternarModoAuth() {
-            modoCadastro = !modoCadastro;
             const titulo = document.getElementById('login-titulo');
             const botaoEnviar = document.getElementById('btn-auth-enviar');
             const txtAlternar = document.getElementById('txt-alternar');
             const btnAlternar = document.getElementById('btn-alternar');
+
+            modoCadastro = !modoCadastro;
 
             if (modoCadastro) {
                 titulo.innerText = "Criar Nova Conta";
@@ -260,7 +261,6 @@
                 telaLogin.classList.add('hidden');
                 conteudoApp.classList.remove('hidden');
                 
-                // Baixa os dados sequencialmente
                 await baixarProgresso();
                 if (bancoQuestoes.length === 0) {
                     await baixarQuestoes();
@@ -283,7 +283,6 @@
 
         // ================= FUNÇÕES DO BANCO DE DADOS E RENDERS =================
 
-        // NOVA FUNÇÃO: Busca o progresso do usuário diretamente do banco de dados
         async function baixarProgresso() {
             if (!usuarioAtual) return;
             try {
@@ -294,7 +293,6 @@
                 
                 if (error) throw error;
 
-                // Limpa os arrays locais para reabastecer
                 certas = [];
                 erradas = [];
                 
@@ -306,9 +304,7 @@
                     }
                 });
 
-                // O total histórico pode ser estimado pela quantidade de registros únicos respondidos
                 totalResolvidasContador = data.length; 
-                
                 atualizarContadores();
             } catch (error) {
                 console.error("Erro ao carregar progresso:", error.message);
@@ -363,19 +359,9 @@
                 let travarInputs = false;
                 let mostrarExplicacao = false;
 
-                if (acertouAinda) {
+                if (questoesNaTelaQueForamRespondidas.includes(q.id) || acertouAinda || (errouAinda && filtroAtual !== 'erradas')) {
                     travarInputs = true;
                     mostrarExplicacao = true;
-                } else if (errouAinda) {
-                    if (filtroAtual === 'nao_resolvidas') {
-                        travarInputs = true;
-                        mostrarExplicacao = true;
-                    } else if (filtroAtual === 'erradas') {
-                        if (questoesRespondidasNaAbaErradasAgora.includes(q.id)) {
-                            travarInputs = true;
-                            mostrarExplicacao = true;
-                        }
-                    }
                 }
 
                 let card = document.createElement('div');
@@ -415,7 +401,7 @@
                             </button>
                         ` : ''}
                         ${acertouAinda ? `<span class="text-sm font-bold text-green-600">✓ Você acertou!</span>` : ''}
-                        ${errouAinda && travarInputs && !acertouAinda ? `<span class="text-sm font-bold text-red-600">✕ Resposta incorreta!</span>` : ''}
+                        ${errouAinda && !acertouAinda ? `<span class="text-sm font-bold text-red-600">✕ Resposta incorreta!</span>` : ''}
                     </div>
 
                     <!-- Caixa de explicação -->
@@ -435,7 +421,6 @@
             }
         }
 
-        // FUNÇÃO ATUALIZADA: Agora envia as respostas direto para o banco de dados via "upsert"
         async function validarResposta(id) {
             const radioSelecionado = document.querySelector(`input[name="q-${id}"]:checked`);
             if (!radioSelecionado) {
@@ -448,65 +433,43 @@
             const acertouAgora = (respostaUsuario === questao.correta.toUpperCase());
             const novoStatus = acertouAgora ? 'certas' : 'erradas';
 
-            // 1. Atualização do estado Local
-            if (!questoesNaTelaQueForamRespondidas.includes(id)) {
-                questoesNaTelaQueForamRespondidas.push(id);
-            }
-
             if (acertouAgora) {
                 if (!certas.includes(id)) certas.push(id);
                 erradas = erradas.filter(item => item !== id);
                 mostrarToast("Excelente! Alternativa correta.", "sucesso");
             } else {
                 if (!erradas.includes(id)) erradas.push(id);
-                if (filtroAtual === 'erradas' && !questoesRespondidasNaAbaErradasAgora.includes(id)) {
-                    questoesRespondidasNaAbaErradasAgora.push(id);
-                }
                 mostrarToast("Que pena, alternativa incorreta! Estude a explicação.", "erro");
             }
 
-            // Incrementar contador temporário da sessão se for uma nova questão resolvida
+            if (!questoesNaTelaQueForamRespondidas.includes(id)) {
+                questoesNaTelaQueForamRespondidas.push(id);
+            }
+
             totalResolvidasContador++;
             atualizarContadores();
+            renderizarQuestoes();
 
-            // 2. Sincronização com o Banco de Dados (Tabela 'progresso')
             try {
-                // Primeiro verificamos se o registro já existe para este usuário e esta questão
                 const { data: registroExistente } = await bancoDeDados
                     .from('progresso')
                     .select('id')
                     .eq('user_id', usuarioAtual.id)
                     .eq('questao_id', id)
-                    .single();
+                    .maybeSingle();
 
                 if (registroExistente) {
-                    // Atualiza o status se já existir
                     await bancoDeDados
                         .from('progresso')
                         .update({ status: novoStatus })
                         .eq('id', registroExistente.id);
                 } else {
-                    // Insere um novo caso não exista (o user_id será preenchido automaticamente pelo banco através do auth.uid())
                     await bancoDeDados
                         .from('progresso')
                         .insert({ questao_id: id, status: novoStatus });
                 }
             } catch (error) {
                 console.error("Erro ao salvar progresso no banco:", error.message);
-            }
-            
-            // 3. Atualização visual do card do HTML
-            const areaFeedback = document.getElementById(`feedback-area-${id}`);
-            if (acertouAgora) {
-                areaFeedback.innerHTML = `<span class="text-sm font-bold text-green-600">✓ Você acertou!</span>`;
-                document.querySelectorAll(`input[name="q-${id}"]`).forEach(input => input.disabled = true);
-                document.getElementById(`explicacao-${id}`).classList.remove('hidden');
-            } else {
-                if (filtroAtual === 'nao_resolvidas' || filtroAtual === 'erradas') {
-                    areaFeedback.innerHTML = `<span class="text-sm font-bold text-red-600">✕ Resposta incorreta!</span>`;
-                    document.querySelectorAll(`input[name="q-${id}"]`).forEach(input => input.disabled = true);
-                    document.getElementById(`explicacao-${id}`).classList.remove('hidden');
-                }
             }
         }
 
@@ -516,11 +479,9 @@
             renderizarQuestoes();
         }
 
-        // FUNÇÃO ATUALIZADA: Limpa os dados do usuário logado na tabela do banco
         async function resetarProgresso() {
             if(confirm("Deseja limpar as abas? As questões voltarão para 'Não resolvidas' tanto na tela quanto no banco de dados.")) {
                 try {
-                    // Deleta o progresso do usuário logado na tabela
                     const { error } = await bancoDeDados
                         .from('progresso')
                         .delete()
