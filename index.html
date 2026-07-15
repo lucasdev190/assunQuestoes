@@ -135,592 +135,1180 @@
         </main>
     </div>
   <script>
+
         // CONFIGURAÇÃO DO SUPABASE
+
         const SUPABASE_URL = "https://ykampvnnrkwvraxanunm.supabase.co";
+
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrYW1wdm5ucmt3dnJheGFudW5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTY1MzMsImV4cCI6MjA5Njg3MjUzM30.CScVluXVuZQ31zLWolNFLREz4mH-Cu-YGxlw6YrfeY8"; 
+
+
 
         const bancoDeDados = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+
+
         let bancoQuestoes = [];
+
         let filtroAtual = 'nao_resolvidas';
+
         let modoCadastro = false;
+
         
+
         // Paginação e controle de exibição
+
         let paginaAtual = 1;
+
         const questoesPorPagina = 20;
+
         
+
         // Segura a questão respondida fixada na tela atual
+
         let questoesNaTelaQueForamRespondidas = [];
+
         // Guarda quais questões foram respondidas DE FATO nesta rodada atual da aba erradas
+
         let questoesRespondidasNaAbaErradasAgora = [];
 
+
+
         // CARREGA O PROGRESSO DO NAVEGADOR
+
         let totalResolvidasContador = parseInt(localStorage.getItem('gq_total_contador')) || 0;
+
         let certas = JSON.parse(localStorage.getItem('gq_certas')) || [];
+
         let erradas = JSON.parse(localStorage.getItem('gq_erradas')) || [];
 
 
+
+
+
         // ================= FUNÇÃO DE MENSAGEM FLUTUANTE CUSTOMIZADA (TOASTS) =================
+
         function mostrarToast(mensagem, tipo = 'sucesso') {
+
             const container = document.getElementById('container-notificacoes');
+
             
+
             // Definição de cores e ícones baseados no tipo do toast
+
             let config = {
+
                 bg: 'bg-green-500',
+
                 icone: '✨'
+
             };
+
             
+
             if (tipo === 'erro') {
+
                 config.bg = 'bg-red-500';
+
                 config.icone = '⚠️';
+
             } else if (tipo === 'aviso') {
+
                 config.bg = 'bg-yellow-500';
+
                 config.icone = 'ℹ️';
+
             }
 
+
+
             // Criar o elemento do Toast
+
             const toast = document.createElement('div');
+
             toast.className = `animar-toast pointer-events-auto flex items-center p-4 rounded-lg shadow-lg text-white ${config.bg} font-medium text-sm space-x-3 transition duration-300 transform`;
+
             toast.innerHTML = `
+
                 <span class="text-lg">${config.icone}</span>
+
                 <span class="flex-1">${mensagem}</span>
+
                 <button onclick="this.parentElement.remove()" class="hover:opacity-75 transition font-bold text-sm">✕</button>
+
             `;
+
+
 
             container.appendChild(toast);
 
+
+
             // Deletar o Toast automaticamente após 4 segundos
+
             setTimeout(() => {
+
                 toast.classList.add('opacity-0', '-translate-y-2');
+
                 setTimeout(() => toast.remove(), 300);
+
             }, 4000);
+
         }
+
+
+
 
 
         // ================= FUNÇÕES DE AUTENTICAÇÃO (SESSÃO) =================
 
+
+
         // Alternar entre tela de login e cadastro
+
         function alternarModoAuth() {
+
             modoCadastro = !modoCadastro;
+
             const titulo = document.getElementById('login-titulo');
+
             const botaoEnviar = document.getElementById('btn-auth-enviar');
+
             const txtAlternar = document.getElementById('txt-alternar');
+
             const btnAlternar = document.getElementById('btn-alternar');
 
+
+
             if (modoCadastro) {
+
                 titulo.innerText = "Criar Nova Conta";
+
                 botaoEnviar.innerText = "Cadastrar";
+
                 txtAlternar.innerText = "Já tem uma conta?";
+
                 btnAlternar.innerText = "Entre aqui";
+
             } else {
+
                 titulo.innerText = "Plataforma de Questões";
+
                 botaoEnviar.innerText = "Entrar";
+
                 txtAlternar.innerText = "Não tem uma conta?";
+
                 btnAlternar.innerText = "Cadastre-se";
+
             }
+
         }
+
+
 
         // Lidar com o envio do formulário de login/cadastro
+
         async function manipularAutenticacao(event) {
+
             event.preventDefault();
+
             
+
             const email = document.getElementById('auth-email').value;
+
             const senha = document.getElementById('auth-senha').value;
+
             const botao = document.getElementById('btn-auth-enviar');
 
+
+
             botao.disabled = true;
+
             botao.innerText = modoCadastro ? "Cadastrando..." : "Entrando...";
 
+
+
             try {
+
                 if (modoCadastro) {
+
                     const { data, error } = await bancoDeDados.auth.signUp({
+
                         email: email,
+
                         password: senha,
+
                     });
+
                     if (error) throw error;
+
                     
+
                     mostrarToast("Cadastro realizado! Confirme o e-mail ou faça seu login.", "sucesso");
+
                     alternarModoAuth();
+
                 } else {
+
                     const { data, error } = await bancoDeDados.auth.signInWithPassword({
+
                         email: email,
+
                         password: senha,
+
                     });
+
                     if (error) throw error;
+
                     mostrarToast("Login realizado com sucesso! Bem-vindo.", "sucesso");
+
                 }
+
             } catch (error) {
+
                 mostrarToast(error.message, "erro");
+
             } finally {
+
                 botao.disabled = false;
+
                 botao.innerText = modoCadastro ? "Cadastrar" : "Entrar";
+
                 document.getElementById('form-auth').reset();
+
             }
+
         }
+
+
 
         // Monitorar mudança no estado de autenticação (Deslogado/Logado)
+
         bancoDeDados.auth.onAuthStateChange((event, session) => {
+
             const telaLogin = document.getElementById('tela-login');
+
             const conteudoApp = document.getElementById('conteudo-app');
 
+
+
             if (session) {
+
                 telaLogin.classList.add('hidden');
+
                 conteudoApp.classList.remove('hidden');
+
                 
+
                 if (bancoQuestoes.length === 0) {
+
                     baixarQuestoes();
+
                 }
+
             } else {
+
                 telaLogin.classList.remove('hidden');
+
                 conteudoApp.classList.add('hidden');
+
                 bancoQuestoes = []; // Limpa cache local ao deslogar
+
             }
+
         });
 
+
+
         // Função para Deslogar o usuário
+
         async function deslogar() {
+
             await bancoDeDados.auth.signOut();
+
             mostrarToast("Você saiu da plataforma.", "aviso");
+
         }
+
+
 
         // ================= FUNÇÕES DO BANCO DE DADOS E RENDERS =================
 
+
+
         // Algoritmo de Fisher-Yates para embaralhar o array
+
         function embaralhar(array) {
+
             let indiceAtual = array.length, valorTemporario, indiceAleatorio;
+
             while (0 !== indiceAtual) {
+
                 indiceAleatorio = Math.floor(Math.random() * indiceAtual);
+
                 indiceAtual -= 1;
+
                 valorTemporario = array[indiceAtual];
+
                 array[indiceAtual] = array[indiceAleatorio];
+
                 array[indiceAleatorio] = valorTemporario;
+
             }
+
             return array;
+
         }
+
+
 
        async function baixarQuestoes() {
+
             try {
+
                 const { data, error } = await bancoDeDados
+
                     .from('questoes')
+
                     .select('*');
+
                 
+
                 if (error) throw error;
+
                 
+
                 // Embaralha todas as questões para que elas apareçam de forma totalmente aleatória
+
                 bancoQuestoes = embaralhar(data);
+
                 
+
                 paginaAtual = 1; // Reseta para a primeira página
+
                 renderizarQuestoes();
+
                 atualizarContadores();
+
             } catch (error) {
+
                 document.getElementById('lista-questoes').innerHTML = `<p class="text-red-500 text-center">Erro ao carregar dados do banco: ${error.message}</p>`;
+
             }
+
         }
 
+
+
        function renderizarQuestoes() {
+
             const container = document.getElementById('lista-questoes');
+
             container.innerHTML = '';
 
+
+
             const buscaMateria = document.getElementById('busca-materia').value.toLowerCase().trim();
+
             const buscaAssunto = document.getElementById('busca-assunto').value.toLowerCase().trim();
 
+
+
             // Filtra o banco completo com base nas buscas e no status (Certas/Erradas/Não resolvidas)
+
             const questoesFiltradasCompleta = bancoQuestoes.filter(q => {
+
                 const bateMateria = q.materia ? q.materia.toLowerCase().includes(buscaMateria) : true;
+
                 const bateAssunto = q.assunto ? q.assunto.toLowerCase().includes(buscaAssunto) : true;
+
                 if (!bateMateria || !bateAssunto) return false;
+
+
 
                 if (questoesNaTelaQueForamRespondidas.includes(q.id)) return true;
 
+
+
                 if (filtroAtual === 'nao_resolvidas') return !certas.includes(q.id) && !erradas.includes(q.id);
+
                 if (filtroAtual === 'certas') return certas.includes(q.id);
+
                 if (filtroAtual === 'erradas') return erradas.includes(q.id);
+
                 return true;
+
             });
+
+
 
             if (questoesFiltradasCompleta.length === 0) {
+
                 container.innerHTML = '<p class="text-gray-400 text-center py-8">Nenhuma questão encontrada com esses filtros ou buscas.</p>';
+
                 return;
+
             }
+
+
 
             // Paginação: calcula o intervalo de questões para a página atual
+
             const totalPaginas = Math.ceil(questoesFiltradasCompleta.length / questoesPorPagina);
+
             
+
             // Garante que a página atual não passe do limite máximo após uma nova filtragem
+
             if (paginaAtual > totalPaginas) {
+
                 paginaAtual = Math.max(1, totalPaginas);
+
             }
 
+
+
             const inicio = (paginaAtual - 1) * questoesPorPagina;
+
             const fim = inicio + questoesPorPagina;
+
             const questoesPagina = questoesFiltradasCompleta.slice(inicio, fim);
 
+
+
             // Renderiza as 20 questões da página atual
+
             questoesPagina.forEach((q) => {
+
                 const acertouAinda = certas.includes(q.id);
+
                 const errouAinda = erradas.includes(q.id);
+
                 
+
                 // REGRAS DE TRAVAMENTO DOS INPUTS:
+
                 let travarInputs = false;
+
                 let mostrarExplicacao = false;
 
+
+
                 if (acertouAinda) {
+
                     travarInputs = true;
+
                     mostrarExplicacao = true;
+
                 } else if (errouAinda) {
+
                     if (filtroAtual === 'nao_resolvidas') {
+
                         travarInputs = true;
+
                         mostrarExplicacao = true;
+
                     } else if (filtroAtual === 'erradas') {
+
                         if (questoesRespondidasNaAbaErradasAgora.includes(q.id)) {
+
                             travarInputs = true;
+
                             mostrarExplicacao = true;
+
                         }
+
                     }
+
                 }
+
+
 
                 let card = document.createElement('div');
+
                 card.className = "bg-white p-6 rounded-lg shadow-sm border space-y-4";
+
                 card.innerHTML = `
+
                     <div class="text-xs text-blue-600 font-semibold space-x-2">
+
                         <span>#${q.id}</span> • <span class="bg-blue-50 px-2 py-0.5 rounded text-blue-700">${q.materia}</span> • <span class="bg-gray-100 px-2 py-0.5 rounded text-gray-700">${q.assunto}</span>
+
                     </div>
+
                     <div class="text-gray-800 text-base font-medium whitespace-pre-line">${q.enunciado}</div>
+
                     
+
                     <!-- Alternativas Embaralhadas Dinamicamente -->
+
                     <div class="space-y-2" id="alternativas-${q.id}">
+
                         ${(() => {
+
                             // 1. Coleta apenas as alternativas que existem no banco para esta questão
+
                             const listaOriginal = [];
+
                             ['1', '2', '3', '4', '5'].forEach(letra => {
+
                                 if (q[`alternativa_${letra}`]) {
+
                                     listaOriginal.push({
+
                                         chaveOriginal: letra,
+
                                         texto: q[`alternativa_${letra}`].trim() // Apenas remove espaços vazios extras
+
                                     });
+
                                 }
+
                             });
 
+
+
                             // 2. Cria uma cópia e embaralha usando o Fisher-Yates que já existe no seu código
+
                             const listaEmbaralhada = embaralhar([...listaOriginal]);
 
-                            // 3. Renderiza o HTML com números sequenciais (1, 2, 3...), mantendo o value original
-                            const letrasVisuais = ['1', '2', '3', '4', '5'];
+
+
+                            // 3. Renderiza o HTML com letras sequenciais (A, B, C...), mantendo o value original
+
+                            const letrasVisuais = ['A', 'B', 'C', 'D', 'E'];
+
                             return listaEmbaralhada.map((item, index) => {
+
                                 const idUnicoRisco = `texto-${q.id}-${item.chaveOriginal}`;
-                                const letraExibida = letrasVisuais[index]; // Sempre mostra 1, 2, 3, 4, 5 de forma ordenada e limpa
+
+                                const letraExibida = letrasVisuais[index]; // Sempre mostra A, B, C, D, E de forma ordenada e limpa
+
+
 
                                 return `
+
                                     <div class="flex items-center gap-2 w-full">
+
                                         <button onclick="alternarRisco('${idUnicoRisco}')" title="Eliminar alternativa" class="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-red-500 transition text-sm">
+
                                             ✂️
+
                                         </button>
+
                                         
+
                                         <label class="flex items-center gap-3 p-3 border rounded-md cursor-pointer hover:bg-gray-50 transition w-full">
+
                                             <input type="radio" name="q-${q.id}" value="${item.chaveOriginal.toUpperCase()}" ${travarInputs ? 'disabled' : ''} class="w-4 h-4 text-blue-600">
+
                                             <span class="font-bold text-gray-500">${letraExibida})</span>
+
                                             <span id="${idUnicoRisco}">${item.texto}</span>
+
                                         </label>
+
                                     </div>
+
                                 `;
+
                             }).join('');
+
                         })()}
+
                     </div>
+
+
 
                     <!-- Botão Responder / Feedback -->
+
                     <div class="flex items-center gap-4" id="feedback-area-${q.id}">
+
                         ${!travarInputs ? `
+
                             <button onclick="validarResposta(${q.id})" id="btn-${q.id}" class="bg-blue-600 text-white px-6 py-2 rounded font-semibold text-sm hover:bg-blue-700 transition">
+
                                 Responder
+
                             </button>
+
                         ` : ''}
+
                         ${acertouAinda ? `<span class="text-sm font-bold text-green-600">✓ Você acertou!</span>` : ''}
+
                         ${errouAinda && travarInputs && !acertouAinda ? `<span class="text-sm font-bold text-red-600">✕ Resposta incorreta!</span>` : ''}
+
                     </div>
+
+
 
                     <!-- Caixa de explicação -->
+
                     <div id="explicacao-${q.id}" class="${mostrarExplicacao ? '' : 'hidden'} bg-yellow-50 border border-yellow-200 p-4 rounded-md mt-4 text-sm text-gray-700">
+
                         <strong class="block text-yellow-800 mb-1">Explicação (Alternativa Correta: ${q.correta.toUpperCase()}):</strong>
+
                         ${q.explicacao}
+
                     </div>
+
                 `;
+
                 container.appendChild(card);
+
             });
 
+
+
             // Cria e insere o componente de navegação de páginas (Abas 1, 2, 3...)
+
             renderizarPaginacao(totalPaginas);
+
         }
 
-        function renderizarPaginacao(totalPaginas) {
+
+
+       function renderizarPaginacao(totalPaginas) {
+
             const container = document.getElementById('lista-questoes');
+
             if (totalPaginas <= 1) return; // Se for apenas 1 página, não precisa exibir a paginação
 
+
+
             // Container principal da Paginação
+
             const paginacaoWrapper = document.createElement('div');
+
             paginacaoWrapper.className = "flex flex-wrap items-center justify-center gap-6 pt-6 mt-6 border-t border-gray-200 text-gray-600";
 
+
+
             // Bloco dos Botões de Páginas (Estilo Grupo Unificado)
+
             const grupoBotoes = document.createElement('div');
+
             grupoBotoes.className = "inline-flex items-center -space-x-px rounded-md border border-gray-200 bg-white shadow-sm overflow-hidden";
 
+
+
             // --- Botão Anterior (<) ---
+
             const btnAnterior = document.createElement('button');
+
             btnAnterior.innerHTML = `
+
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path>
+
                 </svg>
+
             `;
+
             btnAnterior.className = "px-3 py-2 text-gray-500 hover:bg-gray-50 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border-r border-gray-200";
+
             btnAnterior.disabled = paginaAtual === 1;
+
             btnAnterior.onclick = () => {
+
                 if (paginaAtual > 1) {
+
                     paginaAtual--;
+
                     irParaTopoERenderizar();
+
                 }
+
             };
+
             grupoBotoes.appendChild(btnAnterior);
 
+
+
             // --- Lógica de Páginas Inteligentes (com ...) ---
+
             const obterPaginasVisiveis = () => {
+
                 const paginas = [];
+
                 const limiteAdjacentes = 2; // Quantos números mostrar ao redor da página atual
 
+
+
                 if (totalPaginas <= 8) {
+
                     for (let i = 1; i <= totalPaginas; i++) paginas.push(i);
+
                 } else {
+
                     paginas.push(1);
 
+
+
                     let inicio = Math.max(2, paginaAtual - limiteAdjacentes);
+
                     let fim = Math.min(totalPaginas - 1, paginaAtual + limiteAdjacentes);
 
+
+
                     // Ajusta janelas nas extremidades
+
                     if (paginaAtual <= 4) {
+
                         fim = 5;
+
                     } else if (paginaAtual >= totalPaginas - 3) {
+
                         inicio = totalPaginas - 4;
+
                     }
+
+
 
                     if (inicio > 2) paginas.push('...');
 
+
+
                     for (let i = inicio; i <= fim; i++) {
+
                         paginas.push(i);
+
                     }
+
+
 
                     if (fim < totalPaginas - 1) paginas.push('...');
 
+
+
                     paginas.push(totalPaginas);
+
                 }
+
                 return paginas;
+
             };
+
+
 
             const paginasParaMostrar = obterPaginasVisiveis();
 
+
+
             paginasParaMostrar.forEach(p => {
+
                 if (p === '...') {
+
                     const spanEllipsis = document.createElement('span');
+
                     spanEllipsis.innerText = '...';
+
                     spanEllipsis.className = "px-4 py-2 text-gray-400 select-none border-r border-gray-200 bg-white text-sm font-semibold";
+
                     grupoBotoes.appendChild(spanEllipsis);
+
                 } else {
+
                     const btnNum = document.createElement('button');
+
                     btnNum.innerText = p;
+
                     btnNum.onclick = () => {
+
                         paginaAtual = p;
+
                         irParaTopoERenderizar();
+
                     };
 
+
+
                     if (p === paginaAtual) {
+
                         btnNum.className = "px-4 py-2 text-sm font-bold bg-blue-500 text-white border-r border-gray-200 select-none";
+
                     } else {
+
                         btnNum.className = "px-4 py-2 text-sm font-semibold text-blue-600 hover:bg-gray-50 transition border-r border-gray-200 bg-white";
+
                     }
+
                     grupoBotoes.appendChild(btnNum);
+
                 }
+
             });
 
+
+
             // --- Botão Próximo (>) ---
+
             const btnProximo = document.createElement('button');
+
             btnProximo.innerHTML = `
+
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path>
+
                 </svg>
+
             `;
+
             btnProximo.className = "px-3 py-2 text-gray-500 hover:bg-gray-50 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed";
+
             btnProximo.disabled = paginaAtual === totalPaginas;
+
             btnProximo.onclick = () => {
+
                 if (paginaAtual < totalPaginas) {
+
                     paginaAtual++;
+
                     irParaTopoERenderizar();
+
                 }
+
             };
+
             grupoBotoes.appendChild(btnProximo);
+
+
 
             paginacaoWrapper.appendChild(grupoBotoes);
 
+
+
             // --- Seção: Ir Para Página ---
+
             const irParaContainer = document.createElement('div');
+
             irParaContainer.className = "flex items-center gap-2 text-sm text-gray-600";
+
             irParaContainer.innerHTML = `
+
                 <span>Ir para a página:</span>
+
                 <input type="number" id="input-ir-pagina" min="1" max="${totalPaginas}" placeholder="${paginaAtual}" 
+
                     class="w-16 p-2 border border-gray-200 rounded-md text-center outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition font-medium"
+
                 >
+
                 <button id="btn-ir-pagina-ok" class="px-4 py-2 text-sm font-bold border border-blue-500 text-blue-600 rounded-md hover:bg-blue-50 transition bg-white">
+
                     OK
+
                 </button>
+
             `;
 
+
+
             // Lógica de clique do botão OK
+
             const acaoIrParaPagina = () => {
+
                 const input = document.getElementById('input-ir-pagina');
+
                 const valor = parseInt(input.value);
+
                 if (valor && valor >= 1 && valor <= totalPaginas) {
+
                     paginaAtual = valor;
+
                     irParaTopoERenderizar();
+
                 } else {
+
                     mostrarToast(`Página inválida. Escolha entre 1 e ${totalPaginas}`, "aviso");
+
                 }
+
             };
+
+
 
             irParaContainer.querySelector('#btn-ir-pagina-ok').onclick = acaoIrParaPagina;
+
             
+
             // Permite também apertar "Enter" dentro do input
+
             irParaContainer.querySelector('#input-ir-pagina').onkeydown = (e) => {
+
                 if (e.key === 'Enter') acaoIrParaPagina();
+
             };
 
+
+
             paginacaoWrapper.appendChild(irParaContainer);
+
             container.appendChild(paginacaoWrapper);
+
         }
 
-        // --- Função utilitária auxiliar para subir a tela e atualizar ---
+
+
+        // Função utilitária auxiliar para subir a tela e atualizar
+
         function irParaTopoERenderizar() {
+
             window.scrollTo({ top: 0, behavior: 'smooth' });
+
             renderizarQuestoes();
+
         }
+
+
 
         function alternarRisco(idElemento) {
+
             const elementoTexto = document.getElementById(idElemento);
+
             if (elementoTexto) {
+
                 elementoTexto.classList.toggle('alternativa-riscada');
+
             }
+
         }
 
+
+
         function validarResposta(id) {
+
             const radioSelecionado = document.querySelector(`input[name="q-${id}"]:checked`);
+
             if (!radioSelecionado) {
+
                 mostrarToast("Selecione uma alternativa antes de responder!", "aviso");
+
                 return;
+
             }
+
+
 
             const respostaUsuario = radioSelecionado.value;
+
             const questao = bancoQuestoes.find(q => q.id === id);
 
+
+
             totalResolvidasContador++;
+
             localStorage.setItem('gq_total_contador', totalResolvidasContador);
 
+
+
             if (!questoesNaTelaQueForamRespondidas.includes(id)) {
+
                 questoesNaTelaQueForamRespondidas.push(id);
+
             }
+
+
 
             const acertouAgora = (respostaUsuario === questao.correta.toUpperCase());
 
+
+
             if (acertouAgora) {
+
                 if (!certas.includes(id)) certas.push(id);
+
                 erradas = erradas.filter(item => item !== id);
+
                 mostrarToast("Excelente! Alternativa correta.", "sucesso");
+
             } else {
+
                 if (!erradas.includes(id)) erradas.push(id);
+
                 if (filtroAtual === 'erradas' && !questoesRespondidasNaAbaErradasAgora.includes(id)) {
+
                     questoesRespondidasNaAbaErradasAgora.push(id);
+
                 }
+
                 mostrarToast("Que pena, alternativa incorreta! Estude a explicação.", "erro");
+
             }
+
+
 
             localStorage.setItem('gq_certas', JSON.stringify(certas));
+
             localStorage.setItem('gq_erradas', JSON.stringify(erradas));
 
+
+
             atualizarContadores();
+
             
+
             const areaFeedback = document.getElementById(`feedback-area-${id}`);
+
             
+
             if (acertouAgora) {
+
                 areaFeedback.innerHTML = `<span class="text-sm font-bold text-green-600">✓ Você acertou!</span>`;
+
                 document.querySelectorAll(`input[name="q-${id}"]`).forEach(input => input.disabled = true);
+
                 document.getElementById(`explicacao-${id}`).classList.remove('hidden');
+
             } else {
+
                 if (filtroAtual === 'nao_resolvidas' || filtroAtual === 'erradas') {
+
                     areaFeedback.innerHTML = `<span class="text-sm font-bold text-red-600">✕ Resposta incorreta!</span>`;
+
                     document.querySelectorAll(`input[name="q-${id}"]`).forEach(input => input.disabled = true);
+
                     document.getElementById(`explicacao-${id}`).classList.remove('hidden');
+
                 }
+
             }
+
         }
+
+
 
         function limparTravaERenderizar() {
+
             questoesNaTelaQueForamRespondidas = [];
+
             questoesRespondidasNaAbaErradasAgora = [];
+
             paginaAtual = 1; // Reseta para a primeira página ao pesquisar
+
             renderizarQuestoes();
+
         }
+
+
 
         function resetarProgresso() {
+
             if(confirm("Deseja limpar as abas? As questões voltarão para 'Não resolvidas', mas o seu contador histórico total será mantido nas estatísticas.")) {
+
                 certas = []; 
+
                 erradas = [];
+
                 questoesNaTelaQueForamRespondidas = [];
+
                 questoesRespondidasNaAbaErradasAgora = [];
+
                 localStorage.setItem('gq_certas', JSON.stringify(certas));
+
                 localStorage.setItem('gq_erradas', JSON.stringify(erradas));
+
                 atualizarContadores();
+
                 paginaAtual = 1;
+
                 renderizarQuestoes();
+
                 mostrarToast("Abas de progresso resetadas com sucesso!", "sucesso");
+
             }
+
         }
+
+
 
         function atualizarContadores() {
+
             document.getElementById('cont-total').innerText = totalResolvidasContador;
+
             document.getElementById('stat-resolvidas').innerText = totalResolvidasContador;
+
             document.getElementById('stat-certas').innerText = certas.length;
+
             document.getElementById('stat-erradas').innerText = erradas.length;
+
         }
+
+
 
         function filtrar(tipo) {
+
             filtroAtual = tipo;
+
             questoesNaTelaQueForamRespondidas = []; 
+
             questoesRespondidasNaAbaErradasAgora = [];
+
             paginaAtual = 1; // Reseta para a primeira página ao mudar o filtro
+
             
+
             ['nao_resolvidas', 'certas', 'erradas'].forEach(f => {
+
                 const btn = document.getElementById(`filt-${f}`);
+
                 if(f === tipo) {
+
                     btn.className = "px-4 py-1.5 rounded-full text-sm bg-blue-600 text-white font-medium";
+
                 } else {
+
                     btn.className = "px-4 py-1.5 rounded-full text-sm bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium";
+
                 }
+
             });
+
             renderizarQuestoes();
+
         }
 
+
+
         function mudarAba(aba) {
+
             questoesNaTelaQueForamRespondidas = []; 
+
             questoesRespondidasNaAbaErradasAgora = [];
+
             
+
             if(aba === 'questoes') {
+
                 document.getElementById('aba-questoes').classList.remove('hidden');
+
                 document.getElementById('aba-estatisticas').classList.add('hidden');
+
                 document.getElementById('btn-aba-questoes').className = "font-semibold text-blue-600 border-b-2 border-blue-600 pb-1";
+
                 document.getElementById('btn-aba-estatisticas').className = "font-semibold text-gray-500 hover:text-blue-600 pb-1";
+
                 renderizarQuestoes();
+
             } else {
+
                 document.getElementById('aba-questoes').classList.add('hidden');
+
                 document.getElementById('aba-estatisticas').classList.remove('hidden');
+
                 document.getElementById('btn-aba-questoes').className = "font-semibold text-gray-500 hover:text-blue-600 pb-1";
+
                 document.getElementById('btn-aba-estatisticas').className = "font-semibold text-blue-600 border-b-2 border-blue-600 pb-1";
+
             }
+
         }
-    </script>
+
+    </script> 
+
+
    
 </body>
 </html>
