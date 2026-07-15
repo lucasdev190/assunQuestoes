@@ -134,8 +134,7 @@
 
         </main>
     </div>
-
-   <script>
+  <script>
         // CONFIGURAÇÃO DO SUPABASE
         const SUPABASE_URL = "https://ykampvnnrkwvraxanunm.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlrYW1wdm5ucmt3dnJheGFudW5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyOTY1MzMsImV4cCI6MjA5Njg3MjUzM30.CScVluXVuZQ31zLWolNFLREz4mH-Cu-YGxlw6YrfeY8"; 
@@ -405,11 +404,11 @@
                             // 2. Cria uma cópia e embaralha usando o Fisher-Yates que já existe no seu código
                             const listaEmbaralhada = embaralhar([...listaOriginal]);
 
-                            // 3. Renderiza o HTML com letras sequenciais (A, B, C...), mantendo o value original
-                            const letrasVisuais = ['A', 'B', 'C', 'D', 'E'];
+                            // 3. Renderiza o HTML com números sequenciais (1, 2, 3...), mantendo o value original
+                            const letrasVisuais = ['1', '2', '3', '4', '5'];
                             return listaEmbaralhada.map((item, index) => {
                                 const idUnicoRisco = `texto-${q.id}-${item.chaveOriginal}`;
-                                const letraExibida = letrasVisuais[index]; // Sempre mostra A, B, C, D, E de forma ordenada e limpa
+                                const letraExibida = letrasVisuais[index]; // Sempre mostra 1, 2, 3, 4, 5 de forma ordenada e limpa
 
                                 return `
                                     <div class="flex items-center gap-2 w-full">
@@ -452,7 +451,7 @@
             renderizarPaginacao(totalPaginas);
         }
 
-       function renderizarPaginacao(totalPaginas) {
+        function renderizarPaginacao(totalPaginas) {
             const container = document.getElementById('lista-questoes');
             if (totalPaginas <= 1) return; // Se for apenas 1 página, não precisa exibir a paginação
 
@@ -594,7 +593,7 @@
             container.appendChild(paginacaoWrapper);
         }
 
-        // Função utilitária auxiliar para subir a tela e atualizar
+        // --- Função utilitária auxiliar para subir a tela e atualizar ---
         function irParaTopoERenderizar() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
             renderizarQuestoes();
@@ -722,5 +721,6 @@
             }
         }
     </script>
+   
 </body>
 </html>
