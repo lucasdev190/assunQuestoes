@@ -665,12 +665,12 @@
             const areaFeedback = document.getElementById(`feedback-area-${id}`);
             
             if (acertouAgora) {
-                areaFeedback.innerHTML = `<span class="text-sm font-bold text-green-600">✓ Você acertou! (Gabarito: ${pegarLetraCorretaNaTela(questao)})</span>`;
+                areaFeedback.innerHTML = `<span class="text-sm font-bold text-green-600">✓ Você acertou!</span>`;
                 document.querySelectorAll(`input[name="q-${id}"]`).forEach(input => input.disabled = true);
                 document.getElementById(`explicacao-${id}`).classList.remove('hidden');
             } else {
                 if (filtroAtual === 'nao_resolvidas' || filtroAtual === 'erradas') {
-                    areaFeedback.innerHTML = `<span class="text-sm font-bold text-red-600">✕ Resposta incorreta! (Gabarito: ${pegarLetraCorretaNaTela(questao)})</span>`;
+                    areaFeedback.innerHTML = `<span class="text-sm font-bold text-red-600">✕ Resposta incorreta!</span>`;
                     document.querySelectorAll(`input[name="q-${id}"]`).forEach(input => input.disabled = true);
                     document.getElementById(`explicacao-${id}`).classList.remove('hidden');
                 }
