@@ -410,26 +410,7 @@
                             return listaEmbaralhada.map((item, index) => {
                                 const idUnicoRisco = `texto-${q.id}-${item.chaveOriginal}`;
                                 const letraExibida = letrasVisuais[index]; // Sempre mostra A, B, C, D, E em ordem
-                                
-                                function pegarLetraCorretaNaTela(q) {
-                                    if (!q || !q.correta) return '';
-                                
-                                    // 1. Pega as alternativas que existem na mesma ordem do seu código
-                                    const listaOriginal = [];
-                                    ['a', 'b', 'c', 'd', 'e'].forEach(letra => {
-                                        if (q[`alternativa_${letra}`]) {
-                                            listaOriginal.push(letra);
-                                        }
-                                    });
-                                
-                                    // 2. Descobre o índice (posição) em que a resposta correta está na lista
-                                    const indiceCorreto = listaOriginal.findIndex(letra => letra.toLowerCase() === q.correta.toLowerCase());
-                                
-                                    // 3. Mapeia para a letra visível (A, B, C, D, E)
-                                    const letrasVisuais = ['A', 'B', 'C', 'D', 'E'];
-                                    return indiceCorreto !== -1 ? letrasVisuais[indiceCorreto] : '';
-                                }
-                                
+                                  
                                 return `
                                     <div class="flex items-center gap-2 w-full">
                                         <button onclick="alternarRisco('${idUnicoRisco}')" title="Eliminar alternativa" class="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-red-500 transition text-sm">
