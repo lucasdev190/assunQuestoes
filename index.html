@@ -608,55 +608,70 @@
         }
 
         function validarResposta(id) {
-            const radioSelecionado = document.querySelector(`input[name="q-${id}"]:checked`);
-            if (!radioSelecionado) {
-                mostrarToast("Selecione uma alternativa antes de responder!", "aviso");
-                return;
-            }
+    const radioSelecionado = document.querySelector(`input[name="q-${id}"]:checked`);
+    if (!radioSelecionado) {
+        mostrarToast("Selecione uma alternativa antes de responder!", "aviso");
+        return;
+    }
 
-            const respostaUsuario = radioSelecionado.value;
-            const questao = bancoQuestoes.find(q => q.id === id);
+    const respostaUsuario = radioSelecionado.value; // Chave do BD (ex: 'A', 'B'...)
+    const questao = bancoQuestoes.find(q => q.id === id);
 
-            totalResolvidasContador++;
-            localStorage.setItem('gq_total_contador', totalResolvidasContador);
+    // =========================================================================
+    // 🎯 DESCOBRE A LETRA VISUAL DA TELA (A, B, C, D ou E)
+    // =========================================================================
+    // 1. Acha o input no HTML que tem o valor correto do banco de dados:
+    const inputCorreto = document.querySelector(`input[name="q-${id}"][value="${questao.correta.toUpperCase()}"]`);
+    
+    // 2. Pega o texto do <span> que fica logo após o input (que contém ex: "A)", "B)")
+    let letraVisualDaTela = questao.correta.toUpperCase(); // Fallback por segurança
+    if (inputCorreto && inputCorreto.nextElementSibling) {
+        // Remove parênteses e espaços para pegar só a letra visível
+        letraVisualDaTela = inputCorreto.nextElementSibling.innerText.replace(')', '').trim();
+    }
+    // =========================================================================
 
-            if (!questoesNaTelaQueForamRespondidas.includes(id)) {
-                questoesNaTelaQueForamRespondidas.push(id);
-            }
+    totalResolvidasContador++;
+    localStorage.setItem('gq_total_contador', totalResolvidasContador);
 
-            const acertouAgora = (respostaUsuario === questao.correta.toUpperCase());
+    if (!questoesNaTelaQueForamRespondidas.includes(id)) {
+        questoesNaTelaQueForamRespondidas.push(id);
+    }
 
-            if (acertouAgora) {
-                if (!certas.includes(id)) certas.push(id);
-                erradas = erradas.filter(item => item !== id);
-                mostrarToast("Excelente! Alternativa correta.", "sucesso");
-            } else {
-                if (!erradas.includes(id)) erradas.push(id);
-                if (filtroAtual === 'erradas' && !questoesRespondidasNaAbaErradasAgora.includes(id)) {
-                    questoesRespondidasNaAbaErradasAgora.push(id);
-                }
-                mostrarToast("Que pena, alternativa incorreta! Estude a explicação.", "erro");
-            }
+    const acertouAgora = (respostaUsuario === questao.correta.toUpperCase());
 
-            localStorage.setItem('gq_certas', JSON.stringify(certas));
-            localStorage.setItem('gq_erradas', JSON.stringify(erradas));
-
-            atualizarContadores();
-            
-            const areaFeedback = document.getElementById(`feedback-area-${id}`);
-            
-            if (acertouAgora) {
-                areaFeedback.innerHTML = `<span class="text-sm font-bold text-green-600">✓ Você acertou!</span>`;
-                document.querySelectorAll(`input[name="q-${id}"]`).forEach(input => input.disabled = true);
-                document.getElementById(`explicacao-${id}`).classList.remove('hidden');
-            } else {
-                if (filtroAtual === 'nao_resolvidas' || filtroAtual === 'erradas') {
-                    areaFeedback.innerHTML = `<span class="text-sm font-bold text-red-600">✕ Resposta incorreta!</span>`;
-                    document.querySelectorAll(`input[name="q-${id}"]`).forEach(input => input.disabled = true);
-                    document.getElementById(`explicacao-${id}`).classList.remove('hidden');
-                }
-            }
+    if (acertouAgora) {
+        if (!certas.includes(id)) certas.push(id);
+        erradas = erradas.filter(item => item !== id);
+        mostrarToast("Excelente! Alternativa correta.", "sucesso");
+    } else {
+        if (!erradas.includes(id)) erradas.push(id);
+        if (filtroAtual === 'erradas' && !questoesRespondidasNaAbaErradasAgora.includes(id)) {
+            questoesRespondidasNaAbaErradasAgora.push(id);
         }
+        mostrarToast("Que pena, alternativa incorreta! Estude a explicação.", "erro");
+    }
+
+    localStorage.setItem('gq_certas', JSON.stringify(certas));
+    localStorage.setItem('gq_erradas', JSON.stringify(erradas));
+
+    atualizarContadores();
+    
+    const areaFeedback = document.getElementById(`feedback-area-${id}`);
+    
+    // Exibe o gabarito usando a LETRA VISUAL DA TELA:
+    if (acertouAgora) {
+        areaFeedback.innerHTML = `<span class="text-sm font-bold text-green-600">✓ Você acertou! (Gabarito: ${letraVisualDaTela})</span>`;
+        document.querySelectorAll(`input[name="q-${id}"]`).forEach(input => input.disabled = true);
+        document.getElementById(`explicacao-${id}`).classList.remove('hidden');
+    } else {
+        if (filtroAtual === 'nao_resolvidas' || filtroAtual === 'erradas') {
+            areaFeedback.innerHTML = `<span class="text-sm font-bold text-red-600">✕ Resposta incorreta! (Gabarito: ${letraVisualDaTela})</span>`;
+            document.querySelectorAll(`input[name="q-${id}"]`).forEach(input => input.disabled = true);
+            document.getElementById(`explicacao-${id}`).classList.remove('hidden');
+        }
+    }
+}
 
         function limparTravaERenderizar() {
             questoesNaTelaQueForamRespondidas = [];
